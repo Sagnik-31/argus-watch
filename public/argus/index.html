@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ARGUS — AI Proctoring System</title>
+  <link rel="stylesheet" href="styles.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
+</head>
+<body>
+
+  <!-- ── Landing Screen ── -->
+  <div class="landing-screen" id="landingScreen">
+    <div class="landing-card">
+      <span class="logo-icon">👁</span>
+      <div class="logo-text">ARGUS</div>
+      <div class="tagline">AI that never blinks</div>
+
+      <div class="input-group">
+        <label>Student Name</label>
+        <input type="text" id="studentName" placeholder="Enter your full name" autocomplete="off">
+      </div>
+      <div class="input-group">
+        <label>Exam Code</label>
+        <input type="text" id="examCode" placeholder="Enter exam code" autocomplete="off">
+      </div>
+      <button class="btn-primary" id="startExamBtn">Begin Exam Session</button>
+    </div>
+  </div>
+
+  <!-- ── Exam Screen ── -->
+  <div class="exam-screen" id="examScreen">
+    <!-- Top Bar -->
+    <div class="exam-topbar">
+      <div class="topbar-left">
+        <span class="topbar-logo">👁</span>
+        <span class="topbar-title">ARGUS</span>
+      </div>
+      <div class="topbar-right">
+        <div class="suspicion-badge" id="suspicionBadge">
+          ⚠ Flags: <strong id="flagCount">0</strong>
+        </div>
+        <div class="timer-display" id="timerDisplay">30:00</div>
+      </div>
+    </div>
+
+    <!-- Exam Content -->
+    <div class="exam-content">
+      <div class="exam-question-card">
+        <div class="question-number">Question 1</div>
+        <div class="question-text">Explain the concept of artificial intelligence and its impact on modern society. Discuss at least three real-world applications and their ethical implications.</div>
+        <textarea class="answer-area" placeholder="Type your answer here..."></textarea>
+      </div>
+
+      <div class="exam-question-card">
+        <div class="question-number">Question 2</div>
+        <div class="question-text">Describe the differences between supervised and unsupervised machine learning. Provide examples of when each approach would be most appropriate.</div>
+        <textarea class="answer-area" placeholder="Type your answer here..."></textarea>
+      </div>
+
+      <div class="exam-question-card">
+        <div class="question-number">Question 3</div>
+        <div class="question-text">What are neural networks? Explain how they learn from data, and discuss the significance of deep learning in advancing AI capabilities.</div>
+        <textarea class="answer-area" placeholder="Type your answer here..."></textarea>
+      </div>
+
+      <div class="end-exam-section">
+        <div class="input-group">
+          <label>Enter password to end exam</label>
+          <input type="password" id="endPassword" placeholder="Exam end password">
+        </div>
+        <button class="btn-primary btn-danger" id="endExamBtn">End Exam</button>
+      </div>
+    </div>
+
+    <!-- Webcam -->
+    <div class="webcam-container" id="webcamContainer">
+      <div class="rec-dot"></div>
+      <div class="rec-label">REC</div>
+      <video id="webcamVideo" autoplay muted playsinline></video>
+    </div>
+  </div>
+
+  <!-- ── Warning Popup ── -->
+  <div class="warning-overlay" id="warningOverlay" style="display:none;">
+    <div class="warning-card">
+      <div class="warning-icon">🚨</div>
+      <div class="warning-title">Suspicious Activity Detected</div>
+      <div class="warning-text" id="warningText">ARGUS has detected suspicious activity. This incident has been logged and will be reviewed.</div>
+      <button class="warning-dismiss" id="warningDismiss">I Understand</button>
+    </div>
+  </div>
+
+<script>
+// ══════════════════════════════════════════
+// ARGUS — Student Proctoring Client
+// ══════════════════════════════════════════
+
+const EXAM_DURATION = 30 * 60; // 30 minutes in seconds
+
+let flags = [];
+let flagCount = 0;
+let timerSeconds = EXAM_DURATION;
+let timerInterval = null;
+let examStartTime = null;
+let studentName = '';
+let examCode = '';
+let warningQueue = [];
+let showingWarning = false;
+let faceDetectionInterval = null;
+
+// ── Elements ──
+const landingScreen = document.getElementById('landingScreen');
+const examScreen = document.getElementById('examScreen');
+const startExamBtn = document.getElementById('startExamBtn');
+const endExamBtn = document.getElementById('endExamBtn');
+const timerDisplay = document.getElementById('timerDisplay');
+const flagCountEl = document.getElementById('flagCount');
+const suspicionBadge = document.getElementById('suspicionBadge');
+const warningOverlay = document.getElementById('warningOverlay');
+const warningText = document.getElementById('warningText');
+const warningDismiss = document.getElementById('warningDismiss');
+const webcamVideo = document.getElementById('webcamVideo');
+
+// ── Start Exam ──
+startExamBtn.addEventListener('click', () => {
+  studentName = document.getElementById('studentName').value.trim();
+  examCode = document.getElementById('examCode').value.trim();
+  if (!studentName || !examCode) {
+    alert('Please enter your name and exam code.');
+    return;
+  }
+
+  // Store session info
+  localStorage.setItem('argus_student', studentName);
+  localStorage.setItem('argus_examCode', examCode);
+  localStorage.setItem('argus_flags', '[]');
+  localStorage.setItem('argus_startTime', Date.now().toString());
+
+  landingScreen.style.display = 'none';
+  examScreen.style.display = 'block';
+  examStartTime = Date.now();
+
+  requestFullscreen();
+  startWebcam();
+  startTimer();
+  attachProctoring();
+  initFaceDetection();
+});
+
+// ── Fullscreen ──
+function requestFullscreen() {
+  const el = document.documentElement;
+  (el.requestFullscreen || el.webkitRequestFullscreen || el.msRequestFullscreen || function(){}).call(el);
+}
+
+// ── Webcam ──
+async function startWebcam() {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+    webcamVideo.srcObject = stream;
+  } catch (e) {
+    console.warn('Webcam access denied:', e);
+  }
+}
+
+// ── Timer ──
+function startTimer() {
+  updateTimerDisplay();
+  timerInterval = setInterval(() => {
+    timerSeconds--;
+    updateTimerDisplay();
+    if (timerSeconds <= 0) {
+      clearInterval(timerInterval);
+      endExam();
+    }
+  }, 1000);
+}
+
+function updateTimerDisplay() {
+  const m = Math.floor(timerSeconds / 60).toString().padStart(2, '0');
+  const s = (timerSeconds % 60).toString().padStart(2, '0');
+  timerDisplay.textContent = `${m}:${s}`;
+}
+
+// ── Flagging ──
+function addFlag(type, detail) {
+  const entry = {
+    type: type,
+    detail: detail,
+    timestamp: new Date().toISOString(),
+    elapsedSeconds: Math.round((Date.now() - examStartTime) / 1000)
+  };
+  flags.push(entry);
+  flagCount++;
+  flagCountEl.textContent = flagCount;
+
+  // Update badge style
+  if (flagCount >= 5) {
+    suspicionBadge.className = 'suspicion-badge danger';
+  } else if (flagCount >= 2) {
+    suspicionBadge.className = 'suspicion-badge warning';
+  }
+
+  // Save to localStorage
+  localStorage.setItem('argus_flags', JSON.stringify(flags));
+
+  // Queue warning
+  showWarning(detail);
+}
+
+function showWarning(text) {
+  warningQueue.push(text);
+  if (!showingWarning) displayNextWarning();
+}
+
+function displayNextWarning() {
+  if (warningQueue.length === 0) { showingWarning = false; return; }
+  showingWarning = true;
+  warningText.textContent = 'ARGUS has detected suspicious activity: ' + warningQueue.shift();
+  warningOverlay.style.display = 'flex';
+}
+
+warningDismiss.addEventListener('click', () => {
+  warningOverlay.style.display = 'none';
+  displayNextWarning();
+});
+
+// ── Proctoring Listeners ──
+function attachProctoring() {
+  // Tab switching
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) addFlag('tab_switch', 'Student switched to another tab');
+  });
+
+  // Fullscreen exit
+  document.addEventListener('fullscreenchange', () => {
+    if (!document.fullscreenElement) addFlag('fullscreen_exit', 'Student exited fullscreen mode');
+  });
+  document.addEventListener('webkitfullscreenchange', () => {
+    if (!document.webkitFullscreenElement) addFlag('fullscreen_exit', 'Student exited fullscreen mode');
+  });
+
+  // Copy (Ctrl+C)
+  document.addEventListener('copy', (e) => {
+    e.preventDefault();
+    addFlag('copy_attempt', 'Student attempted to copy content (Ctrl+C)');
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'c') {
+      e.preventDefault();
+      addFlag('copy_attempt', 'Student attempted to copy content (Ctrl+C)');
+    }
+  });
+
+  // Right click
+  document.addEventListener('contextmenu', (e) => {
+    e.preventDefault();
+    addFlag('right_click', 'Student attempted to right-click');
+  });
+}
+
+// ── Face Detection (face-api.js) ──
+async function initFaceDetection() {
+  if (typeof faceapi === 'undefined') {
+    console.warn('face-api.js not loaded');
+    return;
+  }
+  try {
+    const MODEL_URL = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/';
+    await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
+    console.log('Face detection model loaded');
+
+    faceDetectionInterval = setInterval(async () => {
+      if (!webcamVideo.srcObject) return;
+      try {
+        const detections = await faceapi.detectAllFaces(webcamVideo, new faceapi.TinyFaceDetectorOptions());
+        if (detections.length === 0) {
+          addFlag('no_face', 'No face detected in webcam feed');
+        } else if (detections.length > 1) {
+          addFlag('multiple_faces', `Multiple faces detected (${detections.length} faces)`);
+        }
+      } catch(e) { /* ignore detection errors */ }
+    }, 8000);
+  } catch (e) {
+    console.warn('Face detection init failed:', e);
+  }
+}
+
+// ── End Exam ──
+endExamBtn.addEventListener('click', () => {
+  const pw = document.getElementById('endPassword').value;
+  if (pw !== 'argus123') {
+    alert('Incorrect password. You cannot end the exam without the correct password.');
+    return;
+  }
+  endExam();
+});
+
+function endExam() {
+  clearInterval(timerInterval);
+  if (faceDetectionInterval) clearInterval(faceDetectionInterval);
+
+  const duration = Math.round((Date.now() - examStartTime) / 1000);
+  localStorage.setItem('argus_duration', duration.toString());
+  localStorage.setItem('argus_flags', JSON.stringify(flags));
+
+  // Stop webcam
+  if (webcamVideo.srcObject) {
+    webcamVideo.srcObject.getTracks().forEach(t => t.stop());
+  }
+
+  // Exit fullscreen
+  if (document.fullscreenElement) document.exitFullscreen();
+
+  alert('Exam session ended. Your data has been recorded by ARGUS.');
+  window.location.href = 'dashboard.html';
+}
+</script>
+</body>
+</html>
