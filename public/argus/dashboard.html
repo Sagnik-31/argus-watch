@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ARGUS — Invigilator Dashboard</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+</head>
+<body>
+
+  <!-- ── Login Screen ── -->
+  <div class="landing-screen" id="loginScreen">
+    <div class="landing-card">
+      <span class="logo-icon">👁</span>
+      <div class="logo-text">ARGUS</div>
+      <div class="tagline">Invigilator Dashboard</div>
+
+      <div class="input-group">
+        <label>Admin Password</label>
+        <input type="password" id="adminPassword" placeholder="Enter admin password" autocomplete="off">
+      </div>
+      <button class="btn-primary" id="loginBtn">Access Dashboard</button>
+    </div>
+  </div>
+
+  <!-- ── Dashboard ── -->
+  <div class="dashboard" id="dashboard">
+    <div class="dash-header">
+      <div class="dash-header-left">
+        <span class="topbar-logo">👁</span>
+        <div>
+          <div class="topbar-title">ARGUS</div>
+          <div class="dash-subtitle">Invigilator Dashboard</div>
+        </div>
+      </div>
+      <div style="display:flex;gap:12px;align-items:center;">
+        <button class="btn-primary" id="analyzeBtn" style="width:auto;">🤖 Analyze with AI</button>
+        <button class="btn-outline" id="logoutBtn">Logout</button>
+      </div>
+    </div>
+
+    <div class="dash-body">
+      <!-- Stats -->
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-label">Student</div>
+          <div class="stat-value" id="dashStudent" style="font-size:22px;">—</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Exam Duration</div>
+          <div class="stat-value" id="dashDuration" style="font-size:22px;">—</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Total Flags</div>
+          <div class="stat-value" id="dashFlagCount" style="color:var(--accent);">0</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Suspicion Score</div>
+          <div class="stat-value" id="dashScore">0</div>
+          <div id="dashRiskBadge" class="risk-badge green" style="margin-top:8px;">CLEAN</div>
+        </div>
+      </div>
+
+      <!-- Flags Table -->
+      <div class="section-title">📋 Flagged Events</div>
+      <table class="flags-table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Timestamp</th>
+            <th>Elapsed</th>
+            <th>Type</th>
+            <th>Detail</th>
+          </tr>
+        </thead>
+        <tbody id="flagsBody">
+          <tr><td colspan="5" style="text-align:center;padding:24px;color:var(--text-muted);">No flags recorded</td></tr>
+        </tbody>
+      </table>
+
+      <!-- AI Report -->
+      <div class="ai-report-section" id="aiReportSection">
+        <div class="section-title">🤖 AI Analysis Report</div>
+        <div class="ai-verdict" id="aiVerdict"></div>
+        <div class="ai-reasoning" id="aiReasoning"></div>
+        <div class="btn-group">
+          <button class="btn-primary" id="downloadPdfBtn" style="width:auto;">📥 Download Report as PDF</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script>
+// ══════════════════════════════════════════
+// ARGUS — Invigilator Dashboard
+// ══════════════════════════════════════════
+
+const CLAUDE_API_KEY = "YOUR_API_KEY_HERE";
+
+const loginScreen = document.getElementById('loginScreen');
+const dashboard = document.getElementById('dashboard');
+const loginBtn = document.getElementById('loginBtn');
+const logoutBtn = document.getElementById('logoutBtn');
+const analyzeBtn = document.getElementById('analyzeBtn');
+const downloadPdfBtn = document.getElementById('downloadPdfBtn');
+
+let aiReport = null;
+
+// ── Login ──
+loginBtn.addEventListener('click', () => {
+  const pw = document.getElementById('adminPassword').value;
+  if (pw !== 'admin123') {
+    alert('Invalid password.');
+    return;
+  }
+  loginScreen.style.display = 'none';
+  dashboard.style.display = 'block';
+  loadDashboard();
+});
+
+document.getElementById('adminPassword').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') loginBtn.click();
+});
+
+logoutBtn.addEventListener('click', () => {
+  dashboard.style.display = 'none';
+  loginScreen.style.display = 'flex';
+});
+
+// ── Load Dashboard Data ──
+function loadDashboard() {
+  const student = localStorage.getItem('argus_student') || 'Unknown';
+  const durationSec = parseInt(localStorage.getItem('argus_duration') || '0');
+  const flags = JSON.parse(localStorage.getItem('argus_flags') || '[]');
+
+  document.getElementById('dashStudent').textContent = student;
+  document.getElementById('dashDuration').textContent = formatDuration(durationSec);
+  document.getElementById('dashFlagCount').textContent = flags.length;
+
+  // Suspicion score: each flag adds points
+  const scoreMap = {
+    'tab_switch': 15,
+    'fullscreen_exit': 15,
+    'copy_attempt': 20,
+    'right_click': 10,
+    'multiple_faces': 25,
+    'no_face': 10,
+    'gaze_away': 8
+  };
+
+  let score = 0;
+  flags.forEach(f => { score += scoreMap[f.type] || 10; });
+  score = Math.min(score, 100);
+
+  const scoreEl = document.getElementById('dashScore');
+  const badgeEl = document.getElementById('dashRiskBadge');
+  scoreEl.textContent = score + '/100';
+
+  if (score <= 20) {
+    scoreEl.className = 'stat-value risk-green';
+    badgeEl.className = 'risk-badge green';
+    badgeEl.textContent = 'CLEAN';
+  } else if (score <= 50) {
+    scoreEl.className = 'stat-value risk-yellow';
+    badgeEl.className = 'risk-badge yellow';
+    badgeEl.textContent = 'SUSPICIOUS';
+  } else {
+    scoreEl.className = 'stat-value risk-red';
+    badgeEl.className = 'risk-badge red';
+    badgeEl.textContent = 'HIGH RISK';
+  }
+
+  // Populate table
+  const tbody = document.getElementById('flagsBody');
+  if (flags.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:24px;color:var(--text-muted);">No flags recorded — student appears clean</td></tr>';
+  } else {
+    tbody.innerHTML = flags.map((f, i) => {
+      const severe = ['multiple_faces', 'copy_attempt'].includes(f.type);
+      return `<tr>
+        <td>${i + 1}</td>
+        <td>${new Date(f.timestamp).toLocaleTimeString()}</td>
+        <td>${formatDuration(f.elapsedSeconds)}</td>
+        <td><span class="flag-type-badge ${severe ? 'severe' : ''}">${f.type.replace(/_/g, ' ')}</span></td>
+        <td>${f.detail}</td>
+      </tr>`;
+    }).join('');
+  }
+}
+
+function formatDuration(sec) {
+  const m = Math.floor(sec / 60);
+  const s = sec % 60;
+  return `${m}m ${s}s`;
+}
+
+// ── AI Analysis (Claude) ──
+analyzeBtn.addEventListener('click', async () => {
+  const flags = JSON.parse(localStorage.getItem('argus_flags') || '[]');
+  const student = localStorage.getItem('argus_student') || 'Unknown';
+  const duration = parseInt(localStorage.getItem('argus_duration') || '0');
+
+  if (CLAUDE_API_KEY === 'YOUR_API_KEY_HERE') {
+    alert('Please set your Claude API key in dashboard.html (CLAUDE_API_KEY variable).');
+    return;
+  }
+
+  analyzeBtn.disabled = true;
+  analyzeBtn.innerHTML = '<span class="spinner"></span>Analyzing...';
+
+  const prompt = `You are ARGUS, an AI exam proctoring analysis system. Analyze the following exam session data and provide a verdict.
+
+Student: ${student}
+Exam Duration: ${formatDuration(duration)}
+Total Flags: ${flags.length}
+
+Flagged Events:
+${JSON.stringify(flags, null, 2)}
+
+Provide your analysis in this exact format:
+VERDICT: [CLEAN / SUSPICIOUS / HIGH RISK]
+
+REASONING:
+[Write a detailed paragraph analyzing the flagged events, patterns, timing, and severity. Explain your verdict.]
+
+DETAILED REPORT:
+[Provide a comprehensive breakdown of each type of flag, its frequency, and what it suggests about the student's behavior during the exam.]`;
+
+  try {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': CLAUDE_API_KEY,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1024,
+        messages: [{ role: 'user', content: prompt }]
+      })
+    });
+
+    const data = await response.json();
+    const text = data.content?.[0]?.text || 'No response from AI.';
+
+    aiReport = text;
+
+    // Parse verdict
+    const verdictMatch = text.match(/VERDICT:\s*(CLEAN|SUSPICIOUS|HIGH RISK)/i);
+    const verdict = verdictMatch ? verdictMatch[1].toUpperCase() : 'UNKNOWN';
+
+    const verdictEl = document.getElementById('aiVerdict');
+    verdictEl.textContent = '🔍 Verdict: ' + verdict;
+    if (verdict === 'CLEAN') verdictEl.style.color = 'var(--success)';
+    else if (verdict === 'SUSPICIOUS') verdictEl.style.color = 'var(--warning)';
+    else verdictEl.style.color = 'var(--danger)';
+
+    document.getElementById('aiReasoning').textContent = text;
+
+    const section = document.getElementById('aiReportSection');
+    section.classList.add('visible');
+    section.scrollIntoView({ behavior: 'smooth' });
+
+  } catch (e) {
+    alert('AI analysis failed: ' + e.message);
+  } finally {
+    analyzeBtn.disabled = false;
+    analyzeBtn.innerHTML = '🤖 Analyze with AI';
+  }
+});
+
+// ── Download PDF ──
+downloadPdfBtn.addEventListener('click', () => {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+  const student = localStorage.getItem('argus_student') || 'Unknown';
+  const duration = parseInt(localStorage.getItem('argus_duration') || '0');
+  const flags = JSON.parse(localStorage.getItem('argus_flags') || '[]');
+
+  let y = 20;
+  doc.setFontSize(22);
+  doc.setFont('helvetica', 'bold');
+  doc.text('ARGUS — Proctoring Report', 20, y);
+  y += 10;
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'normal');
+  doc.text('AI that never blinks', 20, y);
+  y += 12;
+
+  doc.setDrawColor(33, 150, 243);
+  doc.line(20, y, 190, y);
+  y += 10;
+
+  doc.setFontSize(12);
+  doc.text(`Student: ${student}`, 20, y); y += 7;
+  doc.text(`Duration: ${formatDuration(duration)}`, 20, y); y += 7;
+  doc.text(`Total Flags: ${flags.length}`, 20, y); y += 7;
+  doc.text(`Generated: ${new Date().toLocaleString()}`, 20, y); y += 14;
+
+  doc.setFontSize(14);
+  doc.setFont('helvetica', 'bold');
+  doc.text('Flagged Events', 20, y); y += 8;
+
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'normal');
+  flags.forEach((f, i) => {
+    if (y > 270) { doc.addPage(); y = 20; }
+    doc.text(`${i+1}. [${new Date(f.timestamp).toLocaleTimeString()}] ${f.type} — ${f.detail}`, 20, y);
+    y += 6;
+  });
+
+  if (aiReport) {
+    y += 10;
+    if (y > 250) { doc.addPage(); y = 20; }
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.text('AI Analysis', 20, y); y += 8;
+
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    const lines = doc.splitTextToSize(aiReport, 170);
+    lines.forEach(line => {
+      if (y > 280) { doc.addPage(); y = 20; }
+      doc.text(line, 20, y);
+      y += 5;
+    });
+  }
+
+  doc.save(`ARGUS_Report_${student.replace(/\s+/g, '_')}.pdf`);
+});
+</script>
+</body>
+</html>
