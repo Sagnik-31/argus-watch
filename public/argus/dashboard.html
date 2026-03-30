@@ -62,6 +62,12 @@
         </div>
       </div>
 
+      <!-- Webcam Snapshots -->
+      <div class="section-title">📸 Webcam Snapshots</div>
+      <div class="snapshots-gallery" id="snapshotsGallery">
+        <div class="snapshot-empty">No snapshots captured</div>
+      </div>
+
       <!-- Flags Table -->
       <div class="section-title">📋 Flagged Events</div>
       <table class="flags-table">
@@ -91,6 +97,15 @@
     </div>
   </div>
 
+  <!-- Snapshot Lightbox -->
+  <div class="snapshot-lightbox" id="snapshotLightbox" style="display:none;" onclick="closeLightbox()">
+    <div class="lightbox-content" onclick="event.stopPropagation()">
+      <img id="lightboxImg" src="" alt="Snapshot">
+      <div class="lightbox-meta" id="lightboxMeta"></div>
+      <button class="warning-dismiss" onclick="closeLightbox()" style="margin-top:12px;">Close</button>
+    </div>
+  </div>
+
 <script>
 // ══════════════════════════════════════════
 // ARGUS — Invigilator Dashboard
@@ -110,10 +125,7 @@ let aiReport = null;
 // ── Login ──
 loginBtn.addEventListener('click', () => {
   const pw = document.getElementById('adminPassword').value;
-  if (pw !== 'admin123') {
-    alert('Invalid password.');
-    return;
-  }
+  if (pw !== 'admin123') { alert('Invalid password.'); return; }
   loginScreen.style.display = 'none';
   dashboard.style.display = 'block';
   loadDashboard();
@@ -128,27 +140,21 @@ logoutBtn.addEventListener('click', () => {
   loginScreen.style.display = 'flex';
 });
 
-// ── Load Dashboard Data ──
+// ── Load Dashboard ──
 function loadDashboard() {
   const student = localStorage.getItem('argus_student') || 'Unknown';
   const durationSec = parseInt(localStorage.getItem('argus_duration') || '0');
   const flags = JSON.parse(localStorage.getItem('argus_flags') || '[]');
+  const snapshots = JSON.parse(localStorage.getItem('argus_snapshots') || '[]');
 
   document.getElementById('dashStudent').textContent = student;
   document.getElementById('dashDuration').textContent = formatDuration(durationSec);
   document.getElementById('dashFlagCount').textContent = flags.length;
 
-  // Suspicion score: each flag adds points
   const scoreMap = {
-    'tab_switch': 15,
-    'fullscreen_exit': 15,
-    'copy_attempt': 20,
-    'right_click': 10,
-    'multiple_faces': 25,
-    'no_face': 10,
-    'gaze_away': 8
+    'tab_switch': 15, 'fullscreen_exit': 15, 'copy_attempt': 20,
+    'right_click': 10, 'multiple_faces': 25, 'no_face': 10, 'gaze_away': 8
   };
-
   let score = 0;
   flags.forEach(f => { score += scoreMap[f.type] || 10; });
   score = Math.min(score, 100);
@@ -158,20 +164,14 @@ function loadDashboard() {
   scoreEl.textContent = score + '/100';
 
   if (score <= 20) {
-    scoreEl.className = 'stat-value risk-green';
-    badgeEl.className = 'risk-badge green';
-    badgeEl.textContent = 'CLEAN';
+    scoreEl.className = 'stat-value risk-green'; badgeEl.className = 'risk-badge green'; badgeEl.textContent = 'CLEAN';
   } else if (score <= 50) {
-    scoreEl.className = 'stat-value risk-yellow';
-    badgeEl.className = 'risk-badge yellow';
-    badgeEl.textContent = 'SUSPICIOUS';
+    scoreEl.className = 'stat-value risk-yellow'; badgeEl.className = 'risk-badge yellow'; badgeEl.textContent = 'SUSPICIOUS';
   } else {
-    scoreEl.className = 'stat-value risk-red';
-    badgeEl.className = 'risk-badge red';
-    badgeEl.textContent = 'HIGH RISK';
+    scoreEl.className = 'stat-value risk-red'; badgeEl.className = 'risk-badge red'; badgeEl.textContent = 'HIGH RISK';
   }
 
-  // Populate table
+  // Flags table
   const tbody = document.getElementById('flagsBody');
   if (flags.length === 0) {
     tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:24px;color:var(--text-muted);">No flags recorded — student appears clean</td></tr>';
@@ -187,6 +187,31 @@ function loadDashboard() {
       </tr>`;
     }).join('');
   }
+
+  // Snapshots gallery
+  const gallery = document.getElementById('snapshotsGallery');
+  if (snapshots.length === 0) {
+    gallery.innerHTML = '<div class="snapshot-empty">No snapshots captured during this session</div>';
+  } else {
+    gallery.innerHTML = snapshots.map((s, i) => {
+      const isFlag = s.reason.startsWith('flag_');
+      return `<div class="snapshot-card ${isFlag ? 'snapshot-flagged' : ''}" onclick="openLightbox(${i})">
+        <img src="${s.image}" alt="Snapshot ${i+1}">
+        <div class="snapshot-info">
+          <span class="snapshot-time">${new Date(s.timestamp).toLocaleTimeString()}</span>
+          <span class="snapshot-reason ${isFlag ? 'reason-flag' : ''}">${formatReason(s.reason)}</span>
+        </div>
+      </div>`;
+    }).join('');
+  }
+}
+
+function formatReason(r) {
+  if (r === 'exam_start') return '▶ Start';
+  if (r === 'exam_end') return '⏹ End';
+  if (r === 'periodic') return '🔄 Periodic';
+  if (r.startsWith('flag_')) return '🚨 ' + r.replace('flag_', '').replace(/_/g, ' ');
+  return r;
 }
 
 function formatDuration(sec) {
@@ -195,11 +220,27 @@ function formatDuration(sec) {
   return `${m}m ${s}s`;
 }
 
+// ── Lightbox ──
+function openLightbox(index) {
+  const snapshots = JSON.parse(localStorage.getItem('argus_snapshots') || '[]');
+  const s = snapshots[index];
+  if (!s) return;
+  document.getElementById('lightboxImg').src = s.image;
+  document.getElementById('lightboxMeta').innerHTML =
+    `<strong>${new Date(s.timestamp).toLocaleString()}</strong> · Elapsed: ${formatDuration(s.elapsed)} · Reason: ${formatReason(s.reason)}`;
+  document.getElementById('snapshotLightbox').style.display = 'flex';
+}
+
+function closeLightbox() {
+  document.getElementById('snapshotLightbox').style.display = 'none';
+}
+
 // ── AI Analysis (Claude) ──
 analyzeBtn.addEventListener('click', async () => {
   const flags = JSON.parse(localStorage.getItem('argus_flags') || '[]');
   const student = localStorage.getItem('argus_student') || 'Unknown';
   const duration = parseInt(localStorage.getItem('argus_duration') || '0');
+  const snapshots = JSON.parse(localStorage.getItem('argus_snapshots') || '[]');
 
   if (CLAUDE_API_KEY === 'YOUR_API_KEY_HERE') {
     alert('Please set your Claude API key in dashboard.html (CLAUDE_API_KEY variable).');
@@ -214,6 +255,7 @@ analyzeBtn.addEventListener('click', async () => {
 Student: ${student}
 Exam Duration: ${formatDuration(duration)}
 Total Flags: ${flags.length}
+Webcam Snapshots Captured: ${snapshots.length} (${snapshots.filter(s => s.reason.startsWith('flag_')).length} triggered by flags)
 
 Flagged Events:
 ${JSON.stringify(flags, null, 2)}
@@ -245,10 +287,8 @@ DETAILED REPORT:
 
     const data = await response.json();
     const text = data.content?.[0]?.text || 'No response from AI.';
-
     aiReport = text;
 
-    // Parse verdict
     const verdictMatch = text.match(/VERDICT:\s*(CLEAN|SUSPICIOUS|HIGH RISK)/i);
     const verdict = verdictMatch ? verdictMatch[1].toUpperCase() : 'UNKNOWN';
 
@@ -283,16 +323,13 @@ downloadPdfBtn.addEventListener('click', () => {
   let y = 20;
   doc.setFontSize(22);
   doc.setFont('helvetica', 'bold');
-  doc.text('ARGUS — Proctoring Report', 20, y);
-  y += 10;
+  doc.text('ARGUS — Proctoring Report', 20, y); y += 10;
   doc.setFontSize(10);
   doc.setFont('helvetica', 'normal');
-  doc.text('AI that never blinks', 20, y);
-  y += 12;
+  doc.text('AI that never blinks', 20, y); y += 12;
 
   doc.setDrawColor(33, 150, 243);
-  doc.line(20, y, 190, y);
-  y += 10;
+  doc.line(20, y, 190, y); y += 10;
 
   doc.setFontSize(12);
   doc.text(`Student: ${student}`, 20, y); y += 7;
@@ -324,8 +361,7 @@ downloadPdfBtn.addEventListener('click', () => {
     const lines = doc.splitTextToSize(aiReport, 170);
     lines.forEach(line => {
       if (y > 280) { doc.addPage(); y = 20; }
-      doc.text(line, 20, y);
-      y += 5;
+      doc.text(line, 20, y); y += 5;
     });
   }
 
