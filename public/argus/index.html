@@ -45,32 +45,8 @@
     </div>
 
     <!-- Exam Content -->
-    <div class="exam-content">
-      <div class="exam-question-card">
-        <div class="question-number">Question 1</div>
-        <div class="question-text">Explain the concept of artificial intelligence and its impact on modern society. Discuss at least three real-world applications and their ethical implications.</div>
-        <textarea class="answer-area" placeholder="Type your answer here..."></textarea>
-      </div>
-
-      <div class="exam-question-card">
-        <div class="question-number">Question 2</div>
-        <div class="question-text">Describe the differences between supervised and unsupervised machine learning. Provide examples of when each approach would be most appropriate.</div>
-        <textarea class="answer-area" placeholder="Type your answer here..."></textarea>
-      </div>
-
-      <div class="exam-question-card">
-        <div class="question-number">Question 3</div>
-        <div class="question-text">What are neural networks? Explain how they learn from data, and discuss the significance of deep learning in advancing AI capabilities.</div>
-        <textarea class="answer-area" placeholder="Type your answer here..."></textarea>
-      </div>
-
-      <div class="end-exam-section">
-        <div class="input-group">
-          <label>Enter password to end exam</label>
-          <input type="password" id="endPassword" placeholder="Exam end password">
-        </div>
-        <button class="btn-primary btn-danger" id="endExamBtn">End Exam</button>
-      </div>
+    <div class="exam-content" id="examContent">
+      <!-- Questions injected by JS -->
     </div>
 
     <!-- Webcam -->
@@ -79,6 +55,8 @@
       <div class="rec-label">REC</div>
       <video id="webcamVideo" autoplay muted playsinline></video>
     </div>
+    <!-- Hidden canvas for snapshots -->
+    <canvas id="snapshotCanvas" style="display:none;"></canvas>
   </div>
 
   <!-- ── Warning Popup ── -->
@@ -96,24 +74,79 @@
 // ARGUS — Student Proctoring Client
 // ══════════════════════════════════════════
 
-const EXAM_DURATION = 30 * 60; // 30 minutes in seconds
+const EXAM_DURATION = 30 * 60;
+const SNAPSHOT_INTERVAL = 30000; // 30 seconds
+
+// ── Question Bank ──
+const questions = [
+  {
+    type: 'essay',
+    text: 'Explain the concept of artificial intelligence and its impact on modern society. Discuss at least three real-world applications and their ethical implications.'
+  },
+  {
+    type: 'mcq',
+    text: 'Which of the following is a supervised learning algorithm?',
+    options: ['K-Means Clustering', 'Linear Regression', 'DBSCAN', 'Principal Component Analysis'],
+    correct: 1
+  },
+  {
+    type: 'true_false',
+    text: 'Deep learning is a subset of machine learning that uses neural networks with multiple layers.',
+    correct: true
+  },
+  {
+    type: 'mcq',
+    text: 'What does GPU stand for in the context of AI computing?',
+    options: ['General Purpose Unit', 'Graphics Processing Unit', 'Global Processing Utility', 'Gradient Propagation Unit'],
+    correct: 1
+  },
+  {
+    type: 'short_answer',
+    text: 'Name two common activation functions used in neural networks.'
+  },
+  {
+    type: 'essay',
+    text: 'Describe the differences between supervised and unsupervised machine learning. Provide examples of when each approach would be most appropriate.'
+  },
+  {
+    type: 'true_false',
+    text: 'Overfitting occurs when a model performs well on training data but poorly on unseen data.',
+    correct: true
+  },
+  {
+    type: 'mcq',
+    text: 'Which technique is used to prevent overfitting in neural networks?',
+    options: ['Dropout', 'Gradient Ascent', 'Data Duplication', 'Increasing Learning Rate'],
+    correct: 0
+  },
+  {
+    type: 'short_answer',
+    text: 'What is the purpose of a loss function in machine learning?'
+  },
+  {
+    type: 'true_false',
+    text: 'Natural Language Processing (NLP) is exclusively used for translating languages.',
+    correct: false
+  }
+];
 
 let flags = [];
 let flagCount = 0;
 let timerSeconds = EXAM_DURATION;
 let timerInterval = null;
+let snapshotInterval = null;
 let examStartTime = null;
 let studentName = '';
 let examCode = '';
 let warningQueue = [];
 let showingWarning = false;
 let faceDetectionInterval = null;
+let snapshots = [];
 
 // ── Elements ──
 const landingScreen = document.getElementById('landingScreen');
 const examScreen = document.getElementById('examScreen');
 const startExamBtn = document.getElementById('startExamBtn');
-const endExamBtn = document.getElementById('endExamBtn');
 const timerDisplay = document.getElementById('timerDisplay');
 const flagCountEl = document.getElementById('flagCount');
 const suspicionBadge = document.getElementById('suspicionBadge');
@@ -121,6 +154,71 @@ const warningOverlay = document.getElementById('warningOverlay');
 const warningText = document.getElementById('warningText');
 const warningDismiss = document.getElementById('warningDismiss');
 const webcamVideo = document.getElementById('webcamVideo');
+const examContent = document.getElementById('examContent');
+const snapshotCanvas = document.getElementById('snapshotCanvas');
+
+// ── Render Questions ──
+function renderQuestions() {
+  let html = '';
+  questions.forEach((q, i) => {
+    html += `<div class="exam-question-card" style="animation-delay:${i * 0.08}s">`;
+    html += `<div class="question-number">Question ${i + 1} <span class="q-type-badge q-type-${q.type}">${formatType(q.type)}</span></div>`;
+    html += `<div class="question-text">${q.text}</div>`;
+
+    if (q.type === 'essay') {
+      html += `<textarea class="answer-area" placeholder="Type your detailed answer here..." data-q="${i}"></textarea>`;
+    } else if (q.type === 'short_answer') {
+      html += `<input type="text" class="answer-input" placeholder="Type your answer here..." data-q="${i}">`;
+    } else if (q.type === 'mcq') {
+      html += `<div class="mcq-options">`;
+      q.options.forEach((opt, oi) => {
+        html += `<label class="mcq-option">
+          <input type="radio" name="q${i}" value="${oi}" data-q="${i}">
+          <span class="mcq-letter">${String.fromCharCode(65 + oi)}</span>
+          <span class="mcq-text">${opt}</span>
+        </label>`;
+      });
+      html += `</div>`;
+    } else if (q.type === 'true_false') {
+      html += `<div class="tf-options">
+        <label class="tf-option">
+          <input type="radio" name="q${i}" value="true" data-q="${i}">
+          <span class="tf-btn tf-true">✓ True</span>
+        </label>
+        <label class="tf-option">
+          <input type="radio" name="q${i}" value="false" data-q="${i}">
+          <span class="tf-btn tf-false">✗ False</span>
+        </label>
+      </div>`;
+    }
+
+    html += `</div>`;
+  });
+
+  html += `<div class="end-exam-section">
+    <div class="input-group">
+      <label>Enter password to end exam</label>
+      <input type="password" id="endPassword" placeholder="Exam end password">
+    </div>
+    <button class="btn-primary btn-danger" id="endExamBtn">End Exam</button>
+  </div>`;
+
+  examContent.innerHTML = html;
+
+  document.getElementById('endExamBtn').addEventListener('click', () => {
+    const pw = document.getElementById('endPassword').value;
+    if (pw !== 'argus123') {
+      alert('Incorrect password. You cannot end the exam without the correct password.');
+      return;
+    }
+    endExam();
+  });
+}
+
+function formatType(type) {
+  const map = { essay: 'Essay', mcq: 'Multiple Choice', true_false: 'True / False', short_answer: 'Short Answer' };
+  return map[type] || type;
+}
 
 // ── Start Exam ──
 startExamBtn.addEventListener('click', () => {
@@ -131,11 +229,13 @@ startExamBtn.addEventListener('click', () => {
     return;
   }
 
-  // Store session info
   localStorage.setItem('argus_student', studentName);
   localStorage.setItem('argus_examCode', examCode);
   localStorage.setItem('argus_flags', '[]');
+  localStorage.setItem('argus_snapshots', '[]');
   localStorage.setItem('argus_startTime', Date.now().toString());
+
+  renderQuestions();
 
   landingScreen.style.display = 'none';
   examScreen.style.display = 'block';
@@ -146,6 +246,7 @@ startExamBtn.addEventListener('click', () => {
   startTimer();
   attachProctoring();
   initFaceDetection();
+  startSnapshots();
 });
 
 // ── Fullscreen ──
@@ -162,6 +263,31 @@ async function startWebcam() {
   } catch (e) {
     console.warn('Webcam access denied:', e);
   }
+}
+
+// ── Snapshots ──
+function startSnapshots() {
+  captureSnapshot('exam_start');
+  snapshotInterval = setInterval(() => captureSnapshot('periodic'), SNAPSHOT_INTERVAL);
+}
+
+function captureSnapshot(reason) {
+  if (!webcamVideo.srcObject || webcamVideo.videoWidth === 0) return;
+  snapshotCanvas.width = 320;
+  snapshotCanvas.height = 240;
+  const ctx = snapshotCanvas.getContext('2d');
+  ctx.drawImage(webcamVideo, 0, 0, 320, 240);
+  const dataUrl = snapshotCanvas.toDataURL('image/jpeg', 0.6);
+  const entry = {
+    timestamp: new Date().toISOString(),
+    elapsed: Math.round((Date.now() - examStartTime) / 1000),
+    reason: reason,
+    image: dataUrl
+  };
+  snapshots.push(entry);
+  // Keep max 40 to avoid localStorage limits
+  if (snapshots.length > 40) snapshots.shift();
+  localStorage.setItem('argus_snapshots', JSON.stringify(snapshots));
 }
 
 // ── Timer ──
@@ -186,8 +312,7 @@ function updateTimerDisplay() {
 // ── Flagging ──
 function addFlag(type, detail) {
   const entry = {
-    type: type,
-    detail: detail,
+    type, detail,
     timestamp: new Date().toISOString(),
     elapsedSeconds: Math.round((Date.now() - examStartTime) / 1000)
   };
@@ -195,17 +320,14 @@ function addFlag(type, detail) {
   flagCount++;
   flagCountEl.textContent = flagCount;
 
-  // Update badge style
-  if (flagCount >= 5) {
-    suspicionBadge.className = 'suspicion-badge danger';
-  } else if (flagCount >= 2) {
-    suspicionBadge.className = 'suspicion-badge warning';
-  }
+  if (flagCount >= 5) suspicionBadge.className = 'suspicion-badge danger';
+  else if (flagCount >= 2) suspicionBadge.className = 'suspicion-badge warning';
 
-  // Save to localStorage
   localStorage.setItem('argus_flags', JSON.stringify(flags));
 
-  // Queue warning
+  // Capture snapshot on flag
+  captureSnapshot('flag_' + type);
+
   showWarning(detail);
 }
 
@@ -228,12 +350,10 @@ warningDismiss.addEventListener('click', () => {
 
 // ── Proctoring Listeners ──
 function attachProctoring() {
-  // Tab switching
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) addFlag('tab_switch', 'Student switched to another tab');
   });
 
-  // Fullscreen exit
   document.addEventListener('fullscreenchange', () => {
     if (!document.fullscreenElement) addFlag('fullscreen_exit', 'Student exited fullscreen mode');
   });
@@ -241,7 +361,6 @@ function attachProctoring() {
     if (!document.webkitFullscreenElement) addFlag('fullscreen_exit', 'Student exited fullscreen mode');
   });
 
-  // Copy (Ctrl+C)
   document.addEventListener('copy', (e) => {
     e.preventDefault();
     addFlag('copy_attempt', 'Student attempted to copy content (Ctrl+C)');
@@ -254,19 +373,15 @@ function attachProctoring() {
     }
   });
 
-  // Right click
   document.addEventListener('contextmenu', (e) => {
     e.preventDefault();
     addFlag('right_click', 'Student attempted to right-click');
   });
 }
 
-// ── Face Detection (face-api.js) ──
+// ── Face Detection ──
 async function initFaceDetection() {
-  if (typeof faceapi === 'undefined') {
-    console.warn('face-api.js not loaded');
-    return;
-  }
+  if (typeof faceapi === 'undefined') { console.warn('face-api.js not loaded'); return; }
   try {
     const MODEL_URL = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/';
     await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
@@ -276,42 +391,27 @@ async function initFaceDetection() {
       if (!webcamVideo.srcObject) return;
       try {
         const detections = await faceapi.detectAllFaces(webcamVideo, new faceapi.TinyFaceDetectorOptions());
-        if (detections.length === 0) {
-          addFlag('no_face', 'No face detected in webcam feed');
-        } else if (detections.length > 1) {
-          addFlag('multiple_faces', `Multiple faces detected (${detections.length} faces)`);
-        }
-      } catch(e) { /* ignore detection errors */ }
+        if (detections.length === 0) addFlag('no_face', 'No face detected in webcam feed');
+        else if (detections.length > 1) addFlag('multiple_faces', `Multiple faces detected (${detections.length} faces)`);
+      } catch(e) {}
     }, 8000);
-  } catch (e) {
-    console.warn('Face detection init failed:', e);
-  }
+  } catch (e) { console.warn('Face detection init failed:', e); }
 }
 
 // ── End Exam ──
-endExamBtn.addEventListener('click', () => {
-  const pw = document.getElementById('endPassword').value;
-  if (pw !== 'argus123') {
-    alert('Incorrect password. You cannot end the exam without the correct password.');
-    return;
-  }
-  endExam();
-});
-
 function endExam() {
   clearInterval(timerInterval);
+  clearInterval(snapshotInterval);
   if (faceDetectionInterval) clearInterval(faceDetectionInterval);
+
+  captureSnapshot('exam_end');
 
   const duration = Math.round((Date.now() - examStartTime) / 1000);
   localStorage.setItem('argus_duration', duration.toString());
   localStorage.setItem('argus_flags', JSON.stringify(flags));
+  localStorage.setItem('argus_snapshots', JSON.stringify(snapshots));
 
-  // Stop webcam
-  if (webcamVideo.srcObject) {
-    webcamVideo.srcObject.getTracks().forEach(t => t.stop());
-  }
-
-  // Exit fullscreen
+  if (webcamVideo.srcObject) webcamVideo.srcObject.getTracks().forEach(t => t.stop());
   if (document.fullscreenElement) document.exitFullscreen();
 
   alert('Exam session ended. Your data has been recorded by ARGUS.');
