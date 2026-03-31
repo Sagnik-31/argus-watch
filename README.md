@@ -1,3 +1,1 @@
-# Welcome to your Lovable project
-
-TODO: Document your project here
+Building AI proctoring system which helps reduce cheating in virtual examinations.
