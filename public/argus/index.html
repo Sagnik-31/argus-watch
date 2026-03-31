@@ -10,21 +10,53 @@
 <body>
 
   <!-- ── Landing Screen ── -->
-  <div class="landing-screen" id="landingScreen">
+  <div class="landing-screen landing-screen--student" id="landingScreen">
     <div class="landing-card">
-      <span class="logo-icon">👁</span>
-      <div class="logo-text">ARGUS</div>
-      <div class="tagline">AI that never blinks</div>
+      <div class="landing-shell">
+        <section class="landing-hero" aria-label="ARGUS Hero">
+          <span class="logo-icon" aria-hidden="true">👁</span>
+          <div class="logo-text">ARGUS</div>
+          <div class="tagline">AI that never blinks</div>
+        </section>
 
-      <div class="input-group">
-        <label>Student Name</label>
-        <input type="text" id="studentName" placeholder="Enter your full name" autocomplete="off">
+        <section class="landing-features" aria-label="Key features">
+          <div class="feature-card">
+            <div class="feature-icon" aria-hidden="true">👁</div>
+            <div class="feature-title">Eye Tracking</div>
+            <div class="feature-text">Monitors gaze in real time</div>
+          </div>
+
+          <div class="feature-card">
+            <div class="feature-icon" aria-hidden="true">🧠</div>
+            <div class="feature-title">AI Analysis</div>
+            <div class="feature-text">Powered by Claude AI</div>
+          </div>
+
+          <div class="feature-card">
+            <div class="feature-icon" aria-hidden="true">🔒</div>
+            <div class="feature-title">Zero Tolerance</div>
+            <div class="feature-text">Every action monitored</div>
+          </div>
+        </section>
+
+        <div class="landing-cta">
+          <button class="cta-begin" id="beginLandingBtn" type="button">Begin Examination</button>
+        </div>
+
+        <section class="landing-form" id="studentFormArea" aria-hidden="true">
+          <div class="input-group">
+            <label>Student Name</label>
+            <input type="text" id="studentName" placeholder="Enter your full name" autocomplete="off">
+          </div>
+
+          <div class="input-group">
+            <label>Exam Code</label>
+            <input type="text" id="examCode" placeholder="Enter exam code" autocomplete="off">
+          </div>
+
+          <button class="btn-primary" id="startExamBtn">Begin Exam Session</button>
+        </section>
       </div>
-      <div class="input-group">
-        <label>Exam Code</label>
-        <input type="text" id="examCode" placeholder="Enter exam code" autocomplete="off">
-      </div>
-      <button class="btn-primary" id="startExamBtn">Begin Exam Session</button>
     </div>
   </div>
 
@@ -73,6 +105,9 @@
 // ══════════════════════════════════════════
 // ARGUS — Student Proctoring Client
 // ══════════════════════════════════════════
+
+// Used by the landing page CSS for smooth fade-in animations.
+document.body.classList.add('argus-ready');
 
 const EXAM_DURATION = 30 * 60;
 const SNAPSHOT_INTERVAL = 30000; // 30 seconds
@@ -146,7 +181,9 @@ let snapshots = [];
 // ── Elements ──
 const landingScreen = document.getElementById('landingScreen');
 const examScreen = document.getElementById('examScreen');
+const beginLandingBtn = document.getElementById('beginLandingBtn');
 const startExamBtn = document.getElementById('startExamBtn');
+const studentFormArea = document.getElementById('studentFormArea');
 const timerDisplay = document.getElementById('timerDisplay');
 const flagCountEl = document.getElementById('flagCount');
 const suspicionBadge = document.getElementById('suspicionBadge');
@@ -156,6 +193,24 @@ const warningDismiss = document.getElementById('warningDismiss');
 const webcamVideo = document.getElementById('webcamVideo');
 const examContent = document.getElementById('examContent');
 const snapshotCanvas = document.getElementById('snapshotCanvas');
+
+// ── Landing -> Student Form Transition ──
+function revealStudentForm() {
+  if (!landingScreen) return;
+  landingScreen.classList.add('landing-screen--form-open');
+
+  if (studentFormArea) {
+    studentFormArea.setAttribute('aria-hidden', 'false');
+  }
+
+  // Focus helps keyboard users immediately continue the flow.
+  const studentNameInput = document.getElementById('studentName');
+  if (studentNameInput && typeof studentNameInput.focus === 'function') studentNameInput.focus();
+}
+
+if (beginLandingBtn) {
+  beginLandingBtn.addEventListener('click', revealStudentForm);
+}
 
 // ── Render Questions ──
 function renderQuestions() {

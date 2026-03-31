@@ -7,7 +7,7 @@
 }
 
 :root {
-  --bg-primary: #0a0e17;
+  --bg-primary: #0a0a0f;
   --bg-secondary: #111827;
   --bg-card: #1a2332;
   --bg-card-hover: #1f2b3d;
@@ -41,6 +41,51 @@ body {
   min-height: 100vh;
   background: radial-gradient(ellipse at 50% 0%, rgba(33,150,243,0.08) 0%, transparent 60%),
               var(--bg-primary);
+}
+
+/* Grid + subtle particle scan */
+.landing-screen--student::before {
+  content: "";
+  position: absolute;
+  inset: -40px;
+  z-index: 0;
+  pointer-events: none;
+  background-image:
+    radial-gradient(circle at 50% 0%, rgba(33,150,243,0.22) 0%, transparent 60%),
+    repeating-linear-gradient(to right, rgba(33,150,243,0.08) 0 1px, transparent 1px 72px),
+    repeating-linear-gradient(to bottom, rgba(33,150,243,0.08) 0 1px, transparent 1px 72px);
+  background-size: auto, 72px 72px, 72px 72px;
+  background-position: 0 0, 0 0, 0 0;
+  opacity: 0.65;
+  animation: argusGridMove 10s linear infinite;
+}
+
+.landing-screen--student::after {
+  content: "";
+  position: absolute;
+  inset: -40px;
+  z-index: 0;
+  pointer-events: none;
+  background-image:
+    radial-gradient(circle at 15% 25%, rgba(33,150,243,0.18), transparent 38%),
+    radial-gradient(circle at 75% 35%, rgba(33,150,243,0.14), transparent 40%),
+    radial-gradient(circle at 45% 80%, rgba(33,150,243,0.16), transparent 42%),
+    linear-gradient(to bottom, transparent 0%, rgba(33,150,243,0.22) 50%, transparent 100%);
+  background-size: auto, auto, auto, 100% 240px;
+  background-position: 0 0, 0 0, 0 0, 0 -240px;
+  opacity: 0.55;
+  mix-blend-mode: screen;
+  animation: argusScanline 7s linear infinite;
+}
+
+@keyframes argusGridMove {
+  0% { background-position: 0 0, 0 0, 0 0; }
+  100% { background-position: 0 0, 72px 36px, 36px 72px; }
+}
+
+@keyframes argusScanline {
+  0% { background-position: 0 0, 0 0, 0 0, 0 -240px; }
+  100% { background-position: 0 0, 0 0, 0 0, 0 240px; }
 }
 
 .landing-card {
@@ -88,6 +133,243 @@ body {
   letter-spacing: 3px;
   text-transform: uppercase;
   margin-bottom: 36px;
+}
+
+/* Student landing overrides (scoped to public/argus/index.html) */
+.landing-screen--student {
+  position: relative;
+  height: 100vh;
+  min-height: 100vh;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.landing-screen--student .landing-card {
+  background: rgba(26, 35, 50, 0.55);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 26px;
+  padding: 52px 46px;
+  width: min(1120px, 92vw);
+  max-width: 92vw;
+  box-shadow: 0 24px 70px rgba(0,0,0,0.55), 0 0 80px var(--accent-dim);
+  backdrop-filter: blur(18px);
+  overflow: hidden;
+
+  animation: none;
+  opacity: 0;
+  transform: translateY(14px) scale(0.99);
+  transition: opacity 0.7s ease, transform 0.7s ease;
+}
+
+.argus-ready .landing-screen--student .landing-card {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+.landing-screen--student .logo-icon {
+  font-size: 92px;
+  margin-bottom: 8px;
+}
+
+.landing-screen--student .logo-text {
+  font-size: 64px;
+  letter-spacing: 12px;
+  margin-bottom: 2px;
+}
+
+.landing-screen--student .tagline {
+  font-size: 14px;
+  letter-spacing: 4px;
+  margin-bottom: 0;
+}
+
+/* Premium Landing Layout */
+.landing-shell {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  align-items: center;
+  justify-content: center;
+}
+
+.landing-hero {
+  width: 100%;
+  text-align: center;
+}
+
+.landing-features {
+  width: 100%;
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+  align-items: stretch;
+}
+
+.feature-card {
+  flex: 1;
+  min-width: 220px;
+  background: rgba(10, 14, 23, 0.42);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 18px;
+  padding: 20px 18px;
+  backdrop-filter: blur(12px);
+  box-shadow: 0 16px 44px rgba(0,0,0,0.35);
+  text-align: left;
+
+  transform: translateY(14px);
+  opacity: 0;
+  transition: transform 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease, background 0.25s ease;
+}
+
+.argus-ready .landing-hero {
+  animation: argusFadeUp 0.8s ease both;
+}
+
+.argus-ready .landing-features .feature-card {
+  animation: argusFadeUp 0.8s ease both;
+}
+
+.argus-ready .landing-features .feature-card:nth-child(1) { animation-delay: 0.08s; }
+.argus-ready .landing-features .feature-card:nth-child(2) { animation-delay: 0.16s; }
+.argus-ready .landing-features .feature-card:nth-child(3) { animation-delay: 0.24s; }
+
+@keyframes argusFadeUp {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.feature-card:hover {
+  transform: translateY(-6px) scale(1.01);
+  border-color: rgba(33,150,243,0.35);
+  background: rgba(26, 35, 50, 0.58);
+  box-shadow: 0 18px 54px rgba(0,0,0,0.5), 0 0 46px rgba(33,150,243,0.15);
+}
+
+.feature-icon {
+  font-size: 34px;
+  display: block;
+  margin-bottom: 10px;
+  filter: drop-shadow(0 0 18px rgba(33,150,243,0.35));
+}
+
+.feature-title {
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: 0.3px;
+  margin-bottom: 6px;
+}
+
+.feature-text {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.55;
+}
+
+.landing-cta {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  opacity: 0;
+  transform: translateY(10px);
+  max-height: 120px;
+  overflow: hidden;
+}
+
+.argus-ready .landing-cta {
+  animation: argusFadeUp 0.8s ease both;
+  animation-delay: 0.32s;
+}
+
+.cta-begin {
+  width: 100%;
+  max-width: 420px;
+  padding: 16px 22px;
+  font-family: 'Poppins', sans-serif;
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: 0.6px;
+  color: #fff;
+  background: rgba(10, 14, 23, 0.35);
+  border: 1px solid rgba(33, 150, 243, 0.75);
+  border-radius: 16px;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease, background 0.2s ease;
+  position: relative;
+  overflow: hidden;
+
+  box-shadow: 0 0 0 1px rgba(33,150,243,0.12) inset, 0 10px 30px rgba(0,0,0,0.35);
+  animation: ctaPulse 2.6s ease-in-out infinite;
+}
+
+@keyframes ctaPulse {
+  0%, 100% {
+    box-shadow: 0 0 0 1px rgba(33,150,243,0.12) inset, 0 10px 30px rgba(0,0,0,0.35);
+  }
+  50% {
+    box-shadow: 0 0 0 1px rgba(33,150,243,0.28) inset, 0 0 32px rgba(33,150,243,0.18), 0 14px 40px rgba(0,0,0,0.45);
+  }
+}
+
+.cta-begin::before {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  background: linear-gradient(90deg, transparent, rgba(33,150,243,0.95), transparent);
+  transform: translateX(-120%);
+  animation: ctaSweep 2.2s linear infinite;
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+@keyframes ctaSweep {
+  0% { transform: translateX(-120%); }
+  100% { transform: translateX(120%); }
+}
+
+.cta-begin:hover {
+  transform: translateY(-1px);
+  border-color: rgba(33,150,243,1);
+  background: rgba(10, 14, 23, 0.48);
+  box-shadow: 0 0 0 1px rgba(33,150,243,0.28) inset, 0 0 48px rgba(33,150,243,0.22), 0 18px 55px rgba(0,0,0,0.55);
+}
+
+.landing-form {
+  width: 100%;
+  max-height: 0;
+  opacity: 0;
+  transform: translateY(-10px);
+  overflow: hidden;
+  pointer-events: none;
+  visibility: hidden;
+  transition: max-height 0.7s ease, opacity 0.5s ease, transform 0.5s ease;
+}
+
+.landing-screen--form-open .landing-form {
+  max-height: 290px;
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+  visibility: visible;
+}
+
+.landing-screen--form-open {
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 22px;
+}
+
+.landing-screen--form-open .landing-cta {
+  opacity: 0;
+  transform: translateY(-10px);
+  max-height: 0;
+  transition: opacity 0.25s ease, transform 0.35s ease, max-height 0.5s ease;
+  pointer-events: none;
+}
+
+.landing-screen--form-open .landing-shell {
+  justify-content: flex-start;
 }
 
 .input-group {
@@ -648,8 +930,14 @@ body {
 
 /* Responsive */
 @media (max-width: 600px) {
-  .landing-card { padding: 32px 24px; }
-  .logo-text { font-size: 28px; letter-spacing: 5px; }
+  .landing-screen--student .landing-card { padding: 32px 24px; }
+  .landing-screen--student .logo-icon { font-size: 64px; }
+  .landing-screen--student .logo-text { font-size: 28px; letter-spacing: 5px; }
+  .landing-screen--student .landing-shell { gap: 14px; }
+  .landing-screen--student .landing-features { flex-direction: column; gap: 12px; }
+  .landing-screen--student .feature-card { min-width: 0; width: 100%; }
+  .landing-screen--student .cta-begin { max-width: 100%; }
+  .landing-screen--form-open .landing-form { max-height: 320px; }
   .webcam-container { width: 140px; height: 105px; }
   .dash-body { padding: 16px; }
   .stats-grid { grid-template-columns: 1fr; }
