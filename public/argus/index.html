@@ -24,7 +24,8 @@
         <label>Exam Code</label>
         <input type="text" id="examCode" placeholder="Enter exam code" autocomplete="off">
       </div>
-      <button class="btn-primary" id="startExamBtn">Begin Exam Session</button>
+      <button class="btn-primary" id="startExamBtn">Begin Examination</button>
+      <div class="landing-note">This session will be monitored by ARGUS AI</div>
     </div>
   </div>
 
@@ -36,25 +37,67 @@
         <span class="topbar-logo">👁</span>
         <span class="topbar-title">ARGUS</span>
       </div>
+      <div class="topbar-center">
+        <span class="progress-info" id="progressInfo">Q1 of 10</span>
+        <div class="progress-bar-container">
+          <div class="progress-bar-fill" id="progressBarFill" style="width:10%"></div>
+        </div>
+      </div>
       <div class="topbar-right">
         <div class="suspicion-badge" id="suspicionBadge">
           ⚠ Flags: <strong id="flagCount">0</strong>
         </div>
-        <div class="timer-display" id="timerDisplay">30:00</div>
+        <div class="timer-pill" id="timerDisplay">30:00</div>
       </div>
     </div>
 
-    <!-- Exam Content -->
-    <div class="exam-content" id="examContent">
-      <!-- Questions injected by JS -->
+    <!-- Exam Layout -->
+    <div class="exam-layout">
+      <div class="exam-main" id="examContent">
+        <!-- Questions injected by JS -->
+      </div>
+
+      <!-- Right AI Monitor Panel -->
+      <div class="exam-side-panel">
+        <div class="side-panel-title">🎥 Live Feed</div>
+        <div class="webcam-mini" id="webcamMini">
+          <div class="rec-badge">
+            <span class="rec-dot-small"></span>
+            RECORDING ACTIVE
+          </div>
+          <video id="webcamVideo" autoplay muted playsinline></video>
+        </div>
+
+        <div class="side-panel-title" style="margin-top:20px;">🛡 AI Integrity Monitor</div>
+        <div class="monitor-item">
+          <span class="monitor-label">Face Detection</span>
+          <span class="monitor-status on" id="monFace">ON</span>
+        </div>
+        <div class="monitor-item">
+          <span class="monitor-label">Audio Analysis</span>
+          <span class="monitor-status on">ON</span>
+        </div>
+        <div class="monitor-item">
+          <span class="monitor-label">Gaze Tracking</span>
+          <span class="monitor-status on">ON</span>
+        </div>
+        <div class="monitor-item">
+          <span class="monitor-label">Tab Monitor</span>
+          <span class="monitor-status on">ON</span>
+        </div>
+
+        <div class="integrity-bar">
+          <div class="integrity-bar-label">
+            <span>Integrity Score</span>
+            <span id="integrityPercent">100%</span>
+          </div>
+          <div class="integrity-bar-track">
+            <div class="integrity-bar-fill" id="integrityBarFill" style="width:100%"></div>
+          </div>
+        </div>
+      </div>
     </div>
 
-    <!-- Webcam -->
-    <div class="webcam-container" id="webcamContainer">
-      <div class="rec-dot"></div>
-      <div class="rec-label">REC</div>
-      <video id="webcamVideo" autoplay muted playsinline></video>
-    </div>
     <!-- Hidden canvas for snapshots -->
     <canvas id="snapshotCanvas" style="display:none;"></canvas>
   </div>
@@ -75,9 +118,8 @@
 // ══════════════════════════════════════════
 
 const EXAM_DURATION = 30 * 60;
-const SNAPSHOT_INTERVAL = 30000; // 30 seconds
+const SNAPSHOT_INTERVAL = 30000;
 
-// ── Question Bank ──
 const questions = [
   {
     type: 'essay',
@@ -142,8 +184,9 @@ let warningQueue = [];
 let showingWarning = false;
 let faceDetectionInterval = null;
 let snapshots = [];
+let currentQuestion = 0;
+let answeredQuestions = new Set();
 
-// ── Elements ──
 const landingScreen = document.getElementById('landingScreen');
 const examScreen = document.getElementById('examScreen');
 const startExamBtn = document.getElementById('startExamBtn');
@@ -156,24 +199,27 @@ const warningDismiss = document.getElementById('warningDismiss');
 const webcamVideo = document.getElementById('webcamVideo');
 const examContent = document.getElementById('examContent');
 const snapshotCanvas = document.getElementById('snapshotCanvas');
+const progressInfo = document.getElementById('progressInfo');
+const progressBarFill = document.getElementById('progressBarFill');
+const integrityPercent = document.getElementById('integrityPercent');
+const integrityBarFill = document.getElementById('integrityBarFill');
 
-// ── Render Questions ──
 function renderQuestions() {
   let html = '';
   questions.forEach((q, i) => {
-    html += `<div class="exam-question-card" style="animation-delay:${i * 0.08}s">`;
+    html += `<div class="exam-question-card" id="question-${i}">`;
     html += `<div class="question-number">Question ${i + 1} <span class="q-type-badge q-type-${q.type}">${formatType(q.type)}</span></div>`;
     html += `<div class="question-text">${q.text}</div>`;
 
     if (q.type === 'essay') {
-      html += `<textarea class="answer-area" placeholder="Type your detailed answer here..." data-q="${i}"></textarea>`;
+      html += `<textarea class="answer-area" placeholder="Type your detailed answer here..." data-q="${i}" oninput="trackAnswer(${i})"></textarea>`;
     } else if (q.type === 'short_answer') {
-      html += `<input type="text" class="answer-input" placeholder="Type your answer here..." data-q="${i}">`;
+      html += `<input type="text" class="answer-input" placeholder="Type your answer here..." data-q="${i}" oninput="trackAnswer(${i})">`;
     } else if (q.type === 'mcq') {
       html += `<div class="mcq-options">`;
       q.options.forEach((opt, oi) => {
         html += `<label class="mcq-option">
-          <input type="radio" name="q${i}" value="${oi}" data-q="${i}">
+          <input type="radio" name="q${i}" value="${oi}" data-q="${i}" onchange="trackAnswer(${i})">
           <span class="mcq-letter">${String.fromCharCode(65 + oi)}</span>
           <span class="mcq-text">${opt}</span>
         </label>`;
@@ -182,11 +228,11 @@ function renderQuestions() {
     } else if (q.type === 'true_false') {
       html += `<div class="tf-options">
         <label class="tf-option">
-          <input type="radio" name="q${i}" value="true" data-q="${i}">
+          <input type="radio" name="q${i}" value="true" data-q="${i}" onchange="trackAnswer(${i})">
           <span class="tf-btn tf-true">✓ True</span>
         </label>
         <label class="tf-option">
-          <input type="radio" name="q${i}" value="false" data-q="${i}">
+          <input type="radio" name="q${i}" value="false" data-q="${i}" onchange="trackAnswer(${i})">
           <span class="tf-btn tf-false">✗ False</span>
         </label>
       </div>`;
@@ -215,12 +261,42 @@ function renderQuestions() {
   });
 }
 
+function trackAnswer(index) {
+  answeredQuestions.add(index);
+  updateProgress();
+}
+
+function updateProgress() {
+  const answered = answeredQuestions.size;
+  const total = questions.length;
+  progressInfo.textContent = `Q${answered} of ${total} answered`;
+  progressBarFill.style.width = `${(answered / total) * 100}%`;
+}
+
+function updateIntegrity() {
+  const scoreMap = {
+    'tab_switch': 15, 'fullscreen_exit': 15, 'copy_attempt': 20,
+    'right_click': 10, 'multiple_faces': 25, 'no_face': 10, 'gaze_away': 8
+  };
+  let lost = 0;
+  flags.forEach(f => { lost += scoreMap[f.type] || 10; });
+  const integrity = Math.max(0, 100 - lost);
+  integrityPercent.textContent = integrity + '%';
+  integrityBarFill.style.width = integrity + '%';
+  if (integrity > 60) {
+    integrityBarFill.className = 'integrity-bar-fill';
+  } else if (integrity > 30) {
+    integrityBarFill.className = 'integrity-bar-fill medium';
+  } else {
+    integrityBarFill.className = 'integrity-bar-fill low';
+  }
+}
+
 function formatType(type) {
   const map = { essay: 'Essay', mcq: 'Multiple Choice', true_false: 'True / False', short_answer: 'Short Answer' };
   return map[type] || type;
 }
 
-// ── Start Exam ──
 startExamBtn.addEventListener('click', () => {
   studentName = document.getElementById('studentName').value.trim();
   examCode = document.getElementById('examCode').value.trim();
@@ -236,6 +312,7 @@ startExamBtn.addEventListener('click', () => {
   localStorage.setItem('argus_startTime', Date.now().toString());
 
   renderQuestions();
+  updateProgress();
 
   landingScreen.style.display = 'none';
   examScreen.style.display = 'block';
@@ -249,13 +326,11 @@ startExamBtn.addEventListener('click', () => {
   startSnapshots();
 });
 
-// ── Fullscreen ──
 function requestFullscreen() {
   const el = document.documentElement;
   (el.requestFullscreen || el.webkitRequestFullscreen || el.msRequestFullscreen || function(){}).call(el);
 }
 
-// ── Webcam ──
 async function startWebcam() {
   try {
     const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
@@ -265,7 +340,6 @@ async function startWebcam() {
   }
 }
 
-// ── Snapshots ──
 function startSnapshots() {
   captureSnapshot('exam_start');
   snapshotInterval = setInterval(() => captureSnapshot('periodic'), SNAPSHOT_INTERVAL);
@@ -285,12 +359,10 @@ function captureSnapshot(reason) {
     image: dataUrl
   };
   snapshots.push(entry);
-  // Keep max 40 to avoid localStorage limits
   if (snapshots.length > 40) snapshots.shift();
   localStorage.setItem('argus_snapshots', JSON.stringify(snapshots));
 }
 
-// ── Timer ──
 function startTimer() {
   updateTimerDisplay();
   timerInterval = setInterval(() => {
@@ -307,9 +379,13 @@ function updateTimerDisplay() {
   const m = Math.floor(timerSeconds / 60).toString().padStart(2, '0');
   const s = (timerSeconds % 60).toString().padStart(2, '0');
   timerDisplay.textContent = `${m}:${s}`;
+  if (timerSeconds <= 300) {
+    timerDisplay.className = 'timer-pill timer-danger';
+  } else if (timerSeconds <= 600) {
+    timerDisplay.className = 'timer-pill timer-warning';
+  }
 }
 
-// ── Flagging ──
 function addFlag(type, detail) {
   const entry = {
     type, detail,
@@ -324,10 +400,8 @@ function addFlag(type, detail) {
   else if (flagCount >= 2) suspicionBadge.className = 'suspicion-badge warning';
 
   localStorage.setItem('argus_flags', JSON.stringify(flags));
-
-  // Capture snapshot on flag
   captureSnapshot('flag_' + type);
-
+  updateIntegrity();
   showWarning(detail);
 }
 
@@ -348,7 +422,6 @@ warningDismiss.addEventListener('click', () => {
   displayNextWarning();
 });
 
-// ── Proctoring Listeners ──
 function attachProctoring() {
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) addFlag('tab_switch', 'Student switched to another tab');
@@ -379,7 +452,6 @@ function attachProctoring() {
   });
 }
 
-// ── Face Detection ──
 async function initFaceDetection() {
   if (typeof faceapi === 'undefined') { console.warn('face-api.js not loaded'); return; }
   try {
@@ -398,7 +470,6 @@ async function initFaceDetection() {
   } catch (e) { console.warn('Face detection init failed:', e); }
 }
 
-// ── End Exam ──
 function endExam() {
   clearInterval(timerInterval);
   clearInterval(snapshotInterval);
