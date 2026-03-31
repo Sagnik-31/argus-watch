@@ -297,13 +297,16 @@ function formatType(type) {
   return map[type] || type;
 }
 
-startExamBtn.addEventListener('click', () => {
+startExamBtn.addEventListener('click', async () => {
   studentName = document.getElementById('studentName').value.trim();
   examCode = document.getElementById('examCode').value.trim();
   if (!studentName || !examCode) {
     alert('Please enter your name and exam code.');
     return;
   }
+
+  const cameraStream = await requestCameraPermission();
+  if (!cameraStream) return;
 
   localStorage.setItem('argus_student', studentName);
   localStorage.setItem('argus_examCode', examCode);
@@ -319,7 +322,7 @@ startExamBtn.addEventListener('click', () => {
   examStartTime = Date.now();
 
   requestFullscreen();
-  startWebcam();
+  await startWebcam(cameraStream);
   startTimer();
   attachProctoring();
   initFaceDetection();
@@ -331,13 +334,23 @@ function requestFullscreen() {
   (el.requestFullscreen || el.webkitRequestFullscreen || el.msRequestFullscreen || function(){}).call(el);
 }
 
-async function startWebcam() {
+async function requestCameraPermission() {
   try {
-    const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
-    webcamVideo.srcObject = stream;
+    return await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
   } catch (e) {
     console.warn('Webcam access denied:', e);
+    alert('Camera permission is required to start the exam.');
+    return null;
   }
+}
+
+async function startWebcam(stream) {
+  if (stream) {
+    webcamVideo.srcObject = stream;
+    return;
+  }
+  const requestedStream = await requestCameraPermission();
+  if (requestedStream) webcamVideo.srcObject = requestedStream;
 }
 
 function startSnapshots() {
