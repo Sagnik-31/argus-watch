@@ -26,72 +26,162 @@
 
   <!-- ── Dashboard ── -->
   <div class="dashboard" id="dashboard">
-    <div class="dash-header">
-      <div class="dash-header-left">
-        <span class="topbar-logo">👁</span>
-        <div>
-          <div class="topbar-title">ARGUS</div>
-          <div class="dash-subtitle">Invigilator Dashboard</div>
+    <div class="dash-layout">
+
+      <!-- Left Sidebar -->
+      <div class="dash-sidebar">
+        <div class="sidebar-logo">
+          <span class="sidebar-logo-icon">👁</span>
+          <span class="sidebar-logo-text">ARGUS</span>
+        </div>
+        <div class="sidebar-nav">
+          <div class="nav-item active">
+            <span class="nav-item-icon">📊</span> Live Feed
+          </div>
+          <div class="nav-item">
+            <span class="nav-item-icon">📋</span> Session History
+          </div>
+          <div class="nav-item">
+            <span class="nav-item-icon">👥</span> Student Roster
+          </div>
+          <div class="nav-item">
+            <span class="nav-item-icon">📈</span> Analytics
+          </div>
+          <div class="nav-item">
+            <span class="nav-item-icon">⚙️</span> Settings
+          </div>
+        </div>
+        <div class="sidebar-bottom">
+          <div class="nav-item">
+            <span class="nav-item-icon">💬</span> Support
+          </div>
+          <div class="nav-item" id="logoutBtn">
+            <span class="nav-item-icon">🚪</span> Logout
+          </div>
         </div>
       </div>
-      <div style="display:flex;gap:12px;align-items:center;">
-        <button class="btn-primary" id="analyzeBtn" style="width:auto;">🤖 Analyze with AI</button>
-        <button class="btn-outline" id="logoutBtn">Logout</button>
+
+      <!-- Top Navbar -->
+      <div class="dash-topbar">
+        <div class="dash-topbar-left">
+          <span class="dash-exam-name" id="topExamName">Exam Session</span>
+          <span class="dash-session-timer" id="sessionTimer">00:00:00</span>
+        </div>
+        <div class="dash-topbar-right">
+          <button class="btn-lockdown" onclick="alert('Emergency lockdown activated. All student sessions paused.')">🔒 EMERGENCY LOCKDOWN</button>
+          <button class="topbar-icon-btn">🔔</button>
+          <div class="topbar-avatar">A</div>
+        </div>
       </div>
+
+      <!-- Main Content -->
+      <div class="dash-main">
+        <div class="dash-page-title">Global Exam Instance #001</div>
+        <div class="dash-page-subtitle" id="dashExamSubtitle">AI & Machine Learning Fundamentals</div>
+
+        <!-- Stats -->
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-label">Student</div>
+            <div class="stat-value" id="dashStudent" style="font-size:18px;">—</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Duration</div>
+            <div class="stat-value" id="dashDuration" style="font-size:18px;">—</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Total Flags</div>
+            <div class="stat-value" id="dashFlagCount" style="color:var(--accent);">0</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Suspicion Score</div>
+            <div class="stat-value" id="dashScore">0</div>
+            <div id="dashRiskBadge" class="risk-badge green" style="margin-top:6px;">CLEAN</div>
+          </div>
+        </div>
+
+        <!-- Student Grid -->
+        <div class="section-title">📡 Live Student Feeds</div>
+        <div class="student-grid" id="studentGrid">
+          <!-- Populated by JS -->
+        </div>
+
+        <!-- Snapshots -->
+        <div class="section-title">📸 Webcam Snapshots</div>
+        <div class="snapshots-gallery" id="snapshotsGallery">
+          <div class="snapshot-empty">No snapshots captured</div>
+        </div>
+
+        <!-- Flags Table -->
+        <div class="section-title">📋 Flagged Events</div>
+        <table class="flags-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Timestamp</th>
+              <th>Elapsed</th>
+              <th>Type</th>
+              <th>Detail</th>
+            </tr>
+          </thead>
+          <tbody id="flagsBody">
+            <tr><td colspan="5" style="text-align:center;padding:20px;color:var(--text-muted);">No flags recorded</td></tr>
+          </tbody>
+        </table>
+
+        <!-- AI Report -->
+        <div class="ai-report-section" id="aiReportSection">
+          <div class="section-title">🤖 AI Analysis Report</div>
+          <div class="ai-verdict" id="aiVerdict"></div>
+          <div class="ai-reasoning" id="aiReasoning"></div>
+          <div class="btn-group">
+            <button class="btn-primary" id="downloadPdfBtn" style="width:auto;">📥 Download Report as PDF</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right Sidebar - Integrity Feed -->
+      <div class="dash-right-sidebar">
+        <div class="right-sidebar-header">🛡 Integrity Feed</div>
+        <div class="integrity-feed" id="integrityFeed">
+          <!-- Populated by JS -->
+        </div>
+        <div class="right-sidebar-footer">
+          <div class="footer-stat">Students: <strong id="footerStudents">1</strong></div>
+          <div class="footer-stat">Flags: <strong id="footerFlags">0</strong></div>
+        </div>
+      </div>
+
     </div>
+  </div>
 
-    <div class="dash-body">
-      <!-- Stats -->
-      <div class="stats-grid">
-        <div class="stat-card">
-          <div class="stat-label">Student</div>
-          <div class="stat-value" id="dashStudent" style="font-size:22px;">—</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">Exam Duration</div>
-          <div class="stat-value" id="dashDuration" style="font-size:22px;">—</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">Total Flags</div>
-          <div class="stat-value" id="dashFlagCount" style="color:var(--accent);">0</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">Suspicion Score</div>
-          <div class="stat-value" id="dashScore">0</div>
-          <div id="dashRiskBadge" class="risk-badge green" style="margin-top:8px;">CLEAN</div>
-        </div>
+  <!-- Flag Review Modal -->
+  <div class="modal-overlay" id="flagModal" style="display:none;" onclick="closeModal()">
+    <div class="modal-card" onclick="event.stopPropagation()">
+      <div class="modal-left">
+        <img id="modalImg" src="" alt="Student Feed">
+        <div class="modal-flag-overlay" id="modalFlagOverlay">SUSPICIOUS ACTIVITY</div>
       </div>
-
-      <!-- Webcam Snapshots -->
-      <div class="section-title">📸 Webcam Snapshots</div>
-      <div class="snapshots-gallery" id="snapshotsGallery">
-        <div class="snapshot-empty">No snapshots captured</div>
-      </div>
-
-      <!-- Flags Table -->
-      <div class="section-title">📋 Flagged Events</div>
-      <table class="flags-table">
-        <thead>
-          <tr>
-            <th>#</th>
-            <th>Timestamp</th>
-            <th>Elapsed</th>
-            <th>Type</th>
-            <th>Detail</th>
-          </tr>
-        </thead>
-        <tbody id="flagsBody">
-          <tr><td colspan="5" style="text-align:center;padding:24px;color:var(--text-muted);">No flags recorded</td></tr>
-        </tbody>
-      </table>
-
-      <!-- AI Report -->
-      <div class="ai-report-section" id="aiReportSection">
-        <div class="section-title">🤖 AI Analysis Report</div>
-        <div class="ai-verdict" id="aiVerdict"></div>
-        <div class="ai-reasoning" id="aiReasoning"></div>
-        <div class="btn-group">
-          <button class="btn-primary" id="downloadPdfBtn" style="width:auto;">📥 Download Report as PDF</button>
+      <div class="modal-right">
+        <div class="modal-student-name" id="modalStudentName">Student</div>
+        <div class="modal-severity" id="modalSeverity"></div>
+        <div class="modal-stats">
+          <div class="modal-stat">
+            <strong id="modalFlagCount">0</strong>
+            Flags
+          </div>
+          <div class="modal-stat">
+            <strong id="modalSuspicion">0%</strong>
+            Suspicion
+          </div>
+        </div>
+        <div class="modal-section-title">Evidence Timeline</div>
+        <div class="evidence-timeline" id="evidenceTimeline">
+          <!-- Populated by JS -->
+        </div>
+        <div class="modal-actions">
+          <button class="btn-primary" style="width:auto;flex:1;" id="analyzeBtn">🤖 Analyze with AI</button>
+          <button class="btn-outline" onclick="closeModal()">Dismiss</button>
         </div>
       </div>
     </div>
@@ -102,7 +192,7 @@
     <div class="lightbox-content" onclick="event.stopPropagation()">
       <img id="lightboxImg" src="" alt="Snapshot">
       <div class="lightbox-meta" id="lightboxMeta"></div>
-      <button class="warning-dismiss" onclick="closeLightbox()" style="margin-top:12px;">Close</button>
+      <button class="warning-dismiss" onclick="closeLightbox()" style="margin-top:10px;">Close</button>
     </div>
   </div>
 
@@ -121,6 +211,7 @@ const analyzeBtn = document.getElementById('analyzeBtn');
 const downloadPdfBtn = document.getElementById('downloadPdfBtn');
 
 let aiReport = null;
+let sessionTimerInterval = null;
 
 // ── Login ──
 loginBtn.addEventListener('click', () => {
@@ -138,6 +229,7 @@ document.getElementById('adminPassword').addEventListener('keydown', (e) => {
 logoutBtn.addEventListener('click', () => {
   dashboard.style.display = 'none';
   loginScreen.style.display = 'flex';
+  if (sessionTimerInterval) clearInterval(sessionTimerInterval);
 });
 
 // ── Load Dashboard ──
@@ -146,11 +238,23 @@ function loadDashboard() {
   const durationSec = parseInt(localStorage.getItem('argus_duration') || '0');
   const flags = JSON.parse(localStorage.getItem('argus_flags') || '[]');
   const snapshots = JSON.parse(localStorage.getItem('argus_snapshots') || '[]');
+  const examCode = localStorage.getItem('argus_examCode') || 'EX-001';
 
+  document.getElementById('topExamName').textContent = `Exam: ${examCode}`;
   document.getElementById('dashStudent').textContent = student;
   document.getElementById('dashDuration').textContent = formatDuration(durationSec);
   document.getElementById('dashFlagCount').textContent = flags.length;
+  document.getElementById('footerFlags').textContent = flags.length;
 
+  // Session timer
+  let elapsed = durationSec;
+  document.getElementById('sessionTimer').textContent = formatHMS(elapsed);
+  sessionTimerInterval = setInterval(() => {
+    elapsed++;
+    document.getElementById('sessionTimer').textContent = formatHMS(elapsed);
+  }, 1000);
+
+  // Score
   const scoreMap = {
     'tab_switch': 15, 'fullscreen_exit': 15, 'copy_attempt': 20,
     'right_click': 10, 'multiple_faces': 25, 'no_face': 10, 'gaze_away': 8
@@ -163,18 +267,99 @@ function loadDashboard() {
   const badgeEl = document.getElementById('dashRiskBadge');
   scoreEl.textContent = score + '/100';
 
+  let riskLevel = 'CLEAN';
   if (score <= 20) {
-    scoreEl.className = 'stat-value risk-green'; badgeEl.className = 'risk-badge green'; badgeEl.textContent = 'CLEAN';
+    scoreEl.className = 'stat-value risk-green'; badgeEl.className = 'risk-badge green'; riskLevel = 'CLEAN';
   } else if (score <= 50) {
-    scoreEl.className = 'stat-value risk-yellow'; badgeEl.className = 'risk-badge yellow'; badgeEl.textContent = 'SUSPICIOUS';
+    scoreEl.className = 'stat-value risk-yellow'; badgeEl.className = 'risk-badge yellow'; riskLevel = 'SUSPICIOUS';
   } else {
-    scoreEl.className = 'stat-value risk-red'; badgeEl.className = 'risk-badge red'; badgeEl.textContent = 'HIGH RISK';
+    scoreEl.className = 'stat-value risk-red'; badgeEl.className = 'risk-badge red'; riskLevel = 'HIGH RISK';
   }
+  badgeEl.textContent = riskLevel;
+
+  // Student grid cards
+  const integrity = Math.max(0, 100 - score);
+  const latestSnap = snapshots.length > 0 ? snapshots[snapshots.length - 1].image : '';
+  const studentGrid = document.getElementById('studentGrid');
+  
+  const intColor = integrity > 60 ? 'green' : integrity > 30 ? 'yellow' : 'red';
+  const statusBadge = score > 20 
+    ? '<span class="student-status-badge suspicious">SUSPICIOUS ACTIVITY</span>' 
+    : '<span class="student-status-badge clean">CLEAN</span>';
+
+  studentGrid.innerHTML = `
+    <div class="student-card">
+      <div class="student-webcam-placeholder">
+        ${latestSnap ? `<img src="${latestSnap}" alt="Feed">` : 'No feed available'}
+        <div class="student-indicators">
+          <span class="indicator-pill active"><span class="indicator-dot"></span> Audio</span>
+          <span class="indicator-pill active"><span class="indicator-dot"></span> Desktop</span>
+        </div>
+      </div>
+      <div class="student-card-body">
+        <div class="student-card-header">
+          <span class="student-name">${student}</span>
+          <span class="integrity-score ${intColor}">${integrity}%</span>
+        </div>
+        ${statusBadge}
+        <div class="student-card-actions">
+          <button class="btn-sm" onclick="alert('Chat feature coming soon')">💬 Chat</button>
+          <button class="btn-sm" onclick="alert('Student flagged for review')">🚩 Flag</button>
+          <button class="btn-sm btn-sm-primary" onclick="openModal()">Details</button>
+        </div>
+      </div>
+    </div>
+    <div class="student-card" style="opacity:0.4;">
+      <div class="student-webcam-placeholder">Waiting for student...</div>
+      <div class="student-card-body">
+        <div class="student-card-header">
+          <span class="student-name" style="color:var(--text-muted);">—</span>
+          <span class="integrity-score green">—</span>
+        </div>
+        <span class="student-status-badge clean">STANDBY</span>
+        <div class="student-card-actions">
+          <button class="btn-sm" disabled>💬 Chat</button>
+          <button class="btn-sm" disabled>🚩 Flag</button>
+          <button class="btn-sm" disabled>Details</button>
+        </div>
+      </div>
+    </div>
+    <div class="student-card" style="opacity:0.4;">
+      <div class="student-webcam-placeholder">Waiting for student...</div>
+      <div class="student-card-body">
+        <div class="student-card-header">
+          <span class="student-name" style="color:var(--text-muted);">—</span>
+          <span class="integrity-score green">—</span>
+        </div>
+        <span class="student-status-badge clean">STANDBY</span>
+        <div class="student-card-actions">
+          <button class="btn-sm" disabled>💬 Chat</button>
+          <button class="btn-sm" disabled>🚩 Flag</button>
+          <button class="btn-sm" disabled>Details</button>
+        </div>
+      </div>
+    </div>
+    <div class="student-card" style="opacity:0.4;">
+      <div class="student-webcam-placeholder">Waiting for student...</div>
+      <div class="student-card-body">
+        <div class="student-card-header">
+          <span class="student-name" style="color:var(--text-muted);">—</span>
+          <span class="integrity-score green">—</span>
+        </div>
+        <span class="student-status-badge clean">STANDBY</span>
+        <div class="student-card-actions">
+          <button class="btn-sm" disabled>💬 Chat</button>
+          <button class="btn-sm" disabled>🚩 Flag</button>
+          <button class="btn-sm" disabled>Details</button>
+        </div>
+      </div>
+    </div>
+  `;
 
   // Flags table
   const tbody = document.getElementById('flagsBody');
   if (flags.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:24px;color:var(--text-muted);">No flags recorded — student appears clean</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:20px;color:var(--text-muted);">No flags recorded — student appears clean</td></tr>';
   } else {
     tbody.innerHTML = flags.map((f, i) => {
       const severe = ['multiple_faces', 'copy_attempt'].includes(f.type);
@@ -204,6 +389,105 @@ function loadDashboard() {
       </div>`;
     }).join('');
   }
+
+  // Integrity Feed (right sidebar)
+  renderIntegrityFeed(flags, student);
+}
+
+function renderIntegrityFeed(flags, student) {
+  const feed = document.getElementById('integrityFeed');
+  if (flags.length === 0) {
+    feed.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-muted);font-size:13px;">No alerts yet</div>';
+    return;
+  }
+
+  const severityMap = {
+    'multiple_faces': 'high', 'copy_attempt': 'high', 'no_face': 'high',
+    'tab_switch': 'warning', 'fullscreen_exit': 'warning', 'right_click': 'warning',
+    'gaze_away': 'system'
+  };
+
+  feed.innerHTML = flags.slice().reverse().map(f => {
+    const sev = severityMap[f.type] || 'system';
+    const sevLabel = sev === 'high' ? 'HIGH SEVERITY' : sev === 'warning' ? 'WARNING' : 'SYSTEM';
+    return `<div class="feed-item">
+      <div class="feed-item-header">
+        <span class="severity-badge ${sev}">${sevLabel}</span>
+        <span class="feed-time">${new Date(f.timestamp).toLocaleTimeString()}</span>
+      </div>
+      <div class="feed-student">${student}</div>
+      <div class="feed-desc">${f.detail}</div>
+      <button class="feed-review-btn" onclick="openModal()">REVIEW</button>
+    </div>`;
+  }).join('');
+}
+
+// ── Modal ──
+function openModal() {
+  const student = localStorage.getItem('argus_student') || 'Unknown';
+  const flags = JSON.parse(localStorage.getItem('argus_flags') || '[]');
+  const snapshots = JSON.parse(localStorage.getItem('argus_snapshots') || '[]');
+
+  const scoreMap = {
+    'tab_switch': 15, 'fullscreen_exit': 15, 'copy_attempt': 20,
+    'right_click': 10, 'multiple_faces': 25, 'no_face': 10, 'gaze_away': 8
+  };
+  let score = 0;
+  flags.forEach(f => { score += scoreMap[f.type] || 10; });
+  score = Math.min(score, 100);
+
+  document.getElementById('modalStudentName').textContent = student;
+  document.getElementById('modalFlagCount').textContent = flags.length;
+  document.getElementById('modalSuspicion').textContent = score + '%';
+
+  const sev = score > 50 ? 'high' : score > 20 ? 'warning' : 'system';
+  const sevLabel = score > 50 ? 'HIGH RISK' : score > 20 ? 'SUSPICIOUS' : 'CLEAN';
+  document.getElementById('modalSeverity').innerHTML = `<span class="severity-badge ${sev}">${sevLabel}</span>`;
+
+  if (score > 20) {
+    document.getElementById('modalFlagOverlay').style.display = 'block';
+  } else {
+    document.getElementById('modalFlagOverlay').style.display = 'none';
+  }
+
+  // Latest snapshot
+  if (snapshots.length > 0) {
+    document.getElementById('modalImg').src = snapshots[snapshots.length - 1].image;
+  }
+
+  // Evidence timeline
+  const severityMap = {
+    'multiple_faces': 'high', 'copy_attempt': 'high', 'no_face': 'high',
+    'tab_switch': 'warn', 'fullscreen_exit': 'warn', 'right_click': 'warn',
+    'gaze_away': 'info'
+  };
+  const iconMap = {
+    'tab_switch': '🔄', 'fullscreen_exit': '⬜', 'copy_attempt': '📋',
+    'right_click': '🖱', 'multiple_faces': '👥', 'no_face': '👤', 'gaze_away': '👁'
+  };
+
+  const timeline = document.getElementById('evidenceTimeline');
+  if (flags.length === 0) {
+    timeline.innerHTML = '<div style="padding:16px;text-align:center;color:var(--text-muted);font-size:13px;">No evidence recorded</div>';
+  } else {
+    timeline.innerHTML = flags.map(f => {
+      const s = severityMap[f.type] || 'info';
+      return `<div class="evidence-item">
+        <div class="evidence-icon ${s}">${iconMap[f.type] || '⚠'}</div>
+        <div class="evidence-details">
+          <div class="evidence-time">${new Date(f.timestamp).toLocaleTimeString()} · ${formatDuration(f.elapsedSeconds)}</div>
+          <div class="evidence-text">${f.detail}</div>
+        </div>
+        <span class="evidence-severity" style="color:var(--${s === 'high' ? 'danger' : s === 'warn' ? 'warning' : 'text-secondary'});">${s.toUpperCase()}</span>
+      </div>`;
+    }).join('');
+  }
+
+  document.getElementById('flagModal').style.display = 'flex';
+}
+
+function closeModal() {
+  document.getElementById('flagModal').style.display = 'none';
 }
 
 function formatReason(r) {
@@ -218,6 +502,13 @@ function formatDuration(sec) {
   const m = Math.floor(sec / 60);
   const s = sec % 60;
   return `${m}m ${s}s`;
+}
+
+function formatHMS(sec) {
+  const h = Math.floor(sec / 3600).toString().padStart(2, '0');
+  const m = Math.floor((sec % 3600) / 60).toString().padStart(2, '0');
+  const s = (sec % 60).toString().padStart(2, '0');
+  return `${h}:${m}:${s}`;
 }
 
 // ── Lightbox ──
@@ -304,6 +595,8 @@ DETAILED REPORT:
     section.classList.add('visible');
     section.scrollIntoView({ behavior: 'smooth' });
 
+    closeModal();
+
   } catch (e) {
     alert('AI analysis failed: ' + e.message);
   } finally {
@@ -328,7 +621,7 @@ downloadPdfBtn.addEventListener('click', () => {
   doc.setFont('helvetica', 'normal');
   doc.text('AI that never blinks', 20, y); y += 12;
 
-  doc.setDrawColor(33, 150, 243);
+  doc.setDrawColor(31, 111, 235);
   doc.line(20, y, 190, y); y += 10;
 
   doc.setFontSize(12);
