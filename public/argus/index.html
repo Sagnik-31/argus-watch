@@ -69,6 +69,16 @@
     </div>
   </div>
 
+  <!-- ── Fullscreen Required Modal ── -->
+  <div class="warning-overlay" id="fullscreenModal" style="display:none;">
+    <div class="warning-card" style="border-color: var(--warning);">
+      <div class="warning-icon">🖥</div>
+      <div class="warning-title" style="color: var(--warning);">Fullscreen Required</div>
+      <div class="warning-text">Fullscreen is required during the exam</div>
+      <button class="warning-dismiss" id="fullscreenReturnBtn" style="background: var(--accent);">Return to Exam</button>
+    </div>
+  </div>
+
 <script>
 // ══════════════════════════════════════════
 // ARGUS — Student Proctoring Client
@@ -142,6 +152,10 @@ let warningQueue = [];
 let showingWarning = false;
 let faceDetectionInterval = null;
 let snapshots = [];
+let webcamStream = null;
+let proctoringAttached = false;
+let examActive = false;
+let fullscreenModalOpen = false;
 
 // ── Elements ──
 const landingScreen = document.getElementById('landingScreen');
@@ -153,6 +167,8 @@ const suspicionBadge = document.getElementById('suspicionBadge');
 const warningOverlay = document.getElementById('warningOverlay');
 const warningText = document.getElementById('warningText');
 const warningDismiss = document.getElementById('warningDismiss');
+const fullscreenModal = document.getElementById('fullscreenModal');
+const fullscreenReturnBtn = document.getElementById('fullscreenReturnBtn');
 const webcamVideo = document.getElementById('webcamVideo');
 const examContent = document.getElementById('examContent');
 const snapshotCanvas = document.getElementById('snapshotCanvas');
@@ -221,13 +237,45 @@ function formatType(type) {
 }
 
 // ── Start Exam ──
-startExamBtn.addEventListener('click', () => {
+startExamBtn.addEventListener('click', async () => {
   studentName = document.getElementById('studentName').value.trim();
   examCode = document.getElementById('examCode').value.trim();
   if (!studentName || !examCode) {
     alert('Please enter your name and exam code.');
     return;
   }
+
+  const originalBtnText = startExamBtn.textContent;
+  startExamBtn.disabled = true;
+  startExamBtn.textContent = 'Requesting camera permission...';
+
+  try {
+    await ensureCameraPermission();
+    startExam();
+  } catch (e) {
+    alert('Camera permission is required to start the exam.');
+  } finally {
+    startExamBtn.disabled = false;
+    startExamBtn.textContent = originalBtnText;
+  }
+});
+
+function startExam() {
+  if (!webcamStream) {
+    alert('Camera permission is required to start the exam.');
+    return;
+  }
+
+  // Reset per-session state
+  flags = [];
+  snapshots = [];
+  flagCount = 0;
+  timerSeconds = EXAM_DURATION;
+  warningQueue = [];
+  showingWarning = false;
+
+  flagCountEl.textContent = '0';
+  suspicionBadge.className = 'suspicion-badge';
 
   localStorage.setItem('argus_student', studentName);
   localStorage.setItem('argus_examCode', examCode);
@@ -237,31 +285,43 @@ startExamBtn.addEventListener('click', () => {
 
   renderQuestions();
 
+  // Only transition to the exam screen after permission + credentials
   landingScreen.style.display = 'none';
   examScreen.style.display = 'block';
-  examStartTime = Date.now();
 
-  requestFullscreen();
-  startWebcam();
-  startTimer();
+  // Attach stream once we show the exam UI
+  webcamVideo.srcObject = webcamStream;
+
+  // Exam "start moment" happens here (timer/flags/timestamps rely on this)
+  examStartTime = Date.now();
+  examActive = true;
+
+  // Fullscreen should be activated after permission + credentials
+  enterFullscreen();
+
+  // Proctoring and timers must start ONLY here
   attachProctoring();
+  startTimer();
   initFaceDetection();
   startSnapshots();
-});
+}
 
 // ── Fullscreen ──
-function requestFullscreen() {
+function enterFullscreen() {
   const el = document.documentElement;
   (el.requestFullscreen || el.webkitRequestFullscreen || el.msRequestFullscreen || function(){}).call(el);
 }
 
 // ── Webcam ──
-async function startWebcam() {
+async function ensureCameraPermission() {
+  if (webcamStream) return webcamStream;
   try {
     const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
-    webcamVideo.srcObject = stream;
+    webcamStream = stream;
+    return webcamStream;
   } catch (e) {
     console.warn('Webcam access denied:', e);
+    throw e;
   }
 }
 
@@ -348,30 +408,83 @@ warningDismiss.addEventListener('click', () => {
   displayNextWarning();
 });
 
+function showFullscreenRequiredModal() {
+  if (!examActive) return;
+  if (fullscreenModalOpen) return;
+  fullscreenModalOpen = true;
+  fullscreenModal.style.display = 'flex';
+}
+
+function hideFullscreenRequiredModal() {
+  fullscreenModalOpen = false;
+  fullscreenModal.style.display = 'none';
+}
+
+fullscreenReturnBtn.addEventListener('click', () => {
+  // Browser fullscreen requires a user gesture → only request fullscreen here.
+  enterFullscreen();
+  hideFullscreenRequiredModal();
+});
+
 // ── Proctoring Listeners ──
 function attachProctoring() {
+  if (proctoringAttached) return;
+  proctoringAttached = true;
+
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) addFlag('tab_switch', 'Student switched to another tab');
   });
 
-  document.addEventListener('fullscreenchange', () => {
-    if (!document.fullscreenElement) addFlag('fullscreen_exit', 'Student exited fullscreen mode');
-  });
-  document.addEventListener('webkitfullscreenchange', () => {
-    if (!document.webkitFullscreenElement) addFlag('fullscreen_exit', 'Student exited fullscreen mode');
-  });
+  function onFullscreenChange() {
+    if (!examActive) return;
+    if (!document.fullscreenElement) {
+      addFlag('fullscreen_exit', 'Student exited fullscreen mode');
+      showFullscreenRequiredModal();
+    }
+  }
+
+  document.addEventListener('fullscreenchange', onFullscreenChange);
+  document.addEventListener('webkitfullscreenchange', onFullscreenChange);
 
   document.addEventListener('copy', (e) => {
     e.preventDefault();
     addFlag('copy_attempt', 'Student attempted to copy content (Ctrl+C)');
   });
 
+  document.addEventListener('paste', (e) => {
+    e.preventDefault();
+    addFlag('paste_attempt', 'Student attempted to paste content (Ctrl+V)');
+  }, true);
+
   document.addEventListener('keydown', (e) => {
-    if ((e.ctrlKey || e.metaKey) && e.key === 'c') {
+    const key = (e.key || '').toLowerCase();
+
+    // ESC handling: can't always prevent leaving fullscreen, but we always flag + warn.
+    if (key === 'escape') {
+      try { e.preventDefault(); } catch (_) {}
+      addFlag('escape_attempt', 'Student pressed ESC (attempted to exit fullscreen)');
+      showFullscreenRequiredModal();
+      return;
+    }
+
+    const isModifier = e.ctrlKey || e.metaKey;
+    if (!isModifier) return;
+
+    // Block common shortcuts
+    if (key === 'c') {
       e.preventDefault();
       addFlag('copy_attempt', 'Student attempted to copy content (Ctrl+C)');
+    } else if (key === 'v') {
+      e.preventDefault();
+      addFlag('paste_attempt', 'Student attempted to paste content (Ctrl+V)');
+    } else if (key === 'a') {
+      e.preventDefault();
+      addFlag('select_all_attempt', 'Student attempted to select all content (Ctrl+A)');
+    } else if (key === 'u') {
+      e.preventDefault();
+      addFlag('view_source_attempt', 'Student attempted to view source (Ctrl+U)');
     }
-  });
+  }, true);
 
   document.addEventListener('contextmenu', (e) => {
     e.preventDefault();
@@ -400,6 +513,9 @@ async function initFaceDetection() {
 
 // ── End Exam ──
 function endExam() {
+  examActive = false;
+  hideFullscreenRequiredModal();
+
   clearInterval(timerInterval);
   clearInterval(snapshotInterval);
   if (faceDetectionInterval) clearInterval(faceDetectionInterval);
