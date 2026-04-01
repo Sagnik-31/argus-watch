@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ARGUS — AI Proctoring System</title>
   <link rel="stylesheet" href="styles.css">
-  <script src="https://webgazer.cs.brown.edu/webgazer.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/webgazer@2.0.1/dist/webgazer.min.js"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
 </head>
 <body>
@@ -186,6 +186,7 @@ let eyeTrackingFlagCount = 0;
 let eyeTrackingSuspicionBonus = 0;
 let lookAwayTimer = null;
 let isLookingAway = false;
+let eyeTrackingInterval = null;
 let calibratedPoints = 0;
 const calibrationClicks = {};
 const LOOK_AWAY_THRESHOLD_MS = 3000;
@@ -334,56 +335,139 @@ function resetLookingAwayTimer() {
   }
 }
 
-function handleLookingAway() {
-  if (lookAwayTimer) return;
+function handleLookingAway(detail) {
+  if (isLookingAway) return;
   isLookingAway = true;
   updateEyeTrackingIndicator(true);
-  lookAwayTimer = setTimeout(() => {
-    lookAwayTimer = null;
-    addFlag('eye_movement', 'Student looked away from screen for 3+ seconds');
-    showWarning('ARGUS detected you looking away from screen');
-    eyeTrackingFlagCount++;
-    localStorage.setItem('eyeTrackingFlags', String(eyeTrackingFlagCount));
-    if (eyeTrackingFlagCount % 3 === 0) {
-      eyeTrackingSuspicionBonus += 15;
-      localStorage.setItem('argus_eye_suspicion_bonus', String(eyeTrackingSuspicionBonus));
-    }
-  }, LOOK_AWAY_THRESHOLD_MS);
+  console.log('LOOKING AWAY DETECTED');
+  console.log('Calling flag function now');
+  console.log('[ARGUS] 🚨 FLAG: eye_movement — ' + detail);
+  addFlag('eye_movement', detail);
+  showWarning('ARGUS detected you looking away from screen');
+  eyeTrackingFlagCount++;
+  localStorage.setItem('eyeTrackingFlags', String(eyeTrackingFlagCount));
+  if (eyeTrackingFlagCount % 3 === 0) {
+    eyeTrackingSuspicionBonus += 15;
+    localStorage.setItem('argus_eye_suspicion_bonus', String(eyeTrackingSuspicionBonus));
+  }
 }
 
 async function startEyeTracking() {
   if (typeof webgazer === 'undefined') {
-    console.warn('webgazer.js not loaded');
-    return;
-  }
-  const setListener = webgazer.setGazerListener || webgazer.setGazeListener;
-  if (!setListener) {
-    console.warn('webgazer listener method missing');
+    console.warn('[ARGUS] ❌ webgazer.js not loaded');
     return;
   }
 
-  setListener.call(webgazer, (data, clock) => {
-    if (data == null || !examActive) return;
-    const screenW = window.innerWidth;
-    const screenH = window.innerHeight;
-    if (data.x < 0 || data.x > screenW || data.y < 0 || data.y > screenH) {
-      handleLookingAway();
-    } else {
-      resetLookingAwayTimer();
-    }
-  });
-
+  // ── STEP 1: Start WebGazer ──
   await webgazer.begin();
-  const videoContainer = document.getElementById('webgazerVideoContainer');
-  const faceOverlay = document.getElementById('webgazerFaceOverlay');
+  console.log('[ARGUS] ✅ WebGazer ready — begin() completed');
+  console.log('[ARGUS] All webgazer methods:', Object.keys(webgazer));
+
+  // ── STEP 2: Show prediction dot ──
+  webgazer.showPredictionPoints(true);
+  console.log('[ARGUS] 🔴 Prediction dot enabled');
+
+  // ── STEP 3: Hide WebGazer video overlay ──
+  var videoContainer = document.getElementById('webgazerVideoContainer');
+  var faceOverlay = document.getElementById('webgazerFaceOverlay');
+  var faceFeedback = document.getElementById('webgazerFaceFeedbackBox');
   if (videoContainer) videoContainer.style.display = 'none';
   if (faceOverlay) faceOverlay.style.display = 'none';
+  if (faceFeedback) faceFeedback.style.display = 'none';
+
+  // ── STEP 4: Wait for WebGazer to be prediction-ready ──
+  console.log('[ARGUS] Waiting for WebGazer to be prediction-ready...');
+  await new Promise(function(resolve) {
+    var resolved = false;
+    var checkReady = setInterval(async function() {
+      if (resolved) return;
+      try {
+        var test = await webgazer.getCurrentPrediction();
+        console.log('[ARGUS] ✅ WebGazer prediction ready! Test:', test);
+        clearInterval(checkReady);
+        resolved = true;
+        resolve();
+      } catch (e) {
+        console.log('[ARGUS] ⏳ Not ready yet:', e.message);
+      }
+    }, 500);
+
+    // Force start after 5 seconds regardless
+    setTimeout(function() {
+      if (!resolved) {
+        clearInterval(checkReady);
+        resolved = true;
+        console.log('[ARGUS] ⚠️ Force starting after 5s timeout');
+        resolve();
+      }
+    }, 5000);
+  });
+
+  // ── STEP 5: Poll gaze via getCurrentPrediction every 200ms ──
+  console.log('[ARGUS] Starting gaze polling');
+
+  eyeTrackingInterval = setInterval(async function() {
+    if (!examActive) return;
+
+    try {
+      var prediction = await webgazer.getCurrentPrediction();
+
+      if (!prediction) {
+        console.log('[ARGUS] Prediction: null — face not detected');
+        if (!lookAwayTimer) {
+          lookAwayTimer = setTimeout(function() {
+            console.log('[ARGUS] FLAGGING: looking away (face lost for 3s)');
+            handleLookingAway('Student looked away from screen for 3+ seconds');
+            lookAwayTimer = null;
+          }, LOOK_AWAY_THRESHOLD_MS);
+        }
+        return;
+      }
+
+      console.log('[ARGUS] Gaze:', Math.round(prediction.x), Math.round(prediction.y));
+
+      var screenW = window.innerWidth;
+      var screenH = window.innerHeight;
+
+      // ── OUTSIDE SCREEN BOUNDS ──
+      if (prediction.x < 0 || prediction.x > screenW ||
+          prediction.y < 0 || prediction.y > screenH) {
+        console.log('[ARGUS] Gaze OUTSIDE screen');
+        if (!lookAwayTimer) {
+          lookAwayTimer = setTimeout(function() {
+            console.log('[ARGUS] FLAGGING: gaze outside screen bounds');
+            handleLookingAway('Student gaze detected outside screen bounds');
+            lookAwayTimer = null;
+          }, LOOK_AWAY_THRESHOLD_MS);
+        }
+        return;
+      }
+
+      // ── ON SCREEN: reset everything ──
+      if (lookAwayTimer) {
+        clearTimeout(lookAwayTimer);
+        lookAwayTimer = null;
+      }
+      if (isLookingAway) {
+        isLookingAway = false;
+        updateEyeTrackingIndicator(false);
+      }
+    } catch (e) {
+      // Silently ignore errors
+    }
+  }, 200);
+
   updateEyeTrackingIndicator(false);
+  console.log('[ARGUS] ✅ Eye tracking fully active (polling mode).');
 }
 
 function stopEyeTracking() {
   resetLookingAwayTimer();
   updateEyeTrackingIndicator(false);
+  if (eyeTrackingInterval) {
+    clearInterval(eyeTrackingInterval);
+    eyeTrackingInterval = null;
+  }
   if (typeof webgazer !== 'undefined' && typeof webgazer.end === 'function') {
     try { webgazer.end(); } catch (_) {}
   }
@@ -529,6 +613,7 @@ function updateTimerDisplay() {
 
 // ── Flagging ──
 function addFlag(type, detail) {
+  console.log('FLAG FUNCTION CALLED', type, detail);
   const entry = {
     type, detail,
     timestamp: new Date().toISOString(),
