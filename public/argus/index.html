@@ -187,9 +187,10 @@ let eyeTrackingSuspicionBonus = 0;
 let lookAwayTimer = null;
 let isLookingAway = false;
 let eyeTrackingInterval = null;
+let eyeFlagCooldown = false;
 let calibratedPoints = 0;
 const calibrationClicks = {};
-const LOOK_AWAY_THRESHOLD_MS = 3000;
+const LOOK_AWAY_THRESHOLD_MS = 2000;
 
 // ── Elements ──
 const landingScreen = document.getElementById('landingScreen');
@@ -337,7 +338,12 @@ function resetLookingAwayTimer() {
 
 function handleLookingAway(detail) {
   if (isLookingAway) return;
+  if (eyeFlagCooldown) {
+    console.log('[ARGUS] ⏳ Flag cooldown active, skipping');
+    return;
+  }
   isLookingAway = true;
+  eyeFlagCooldown = true;
   updateEyeTrackingIndicator(true);
   console.log('LOOKING AWAY DETECTED');
   console.log('Calling flag function now');
@@ -350,6 +356,11 @@ function handleLookingAway(detail) {
     eyeTrackingSuspicionBonus += 15;
     localStorage.setItem('argus_eye_suspicion_bonus', String(eyeTrackingSuspicionBonus));
   }
+  // 5 second cooldown before next flag
+  setTimeout(function() {
+    eyeFlagCooldown = false;
+    console.log('[ARGUS] Flag cooldown ended');
+  }, 5000);
 }
 
 async function startEyeTracking() {
@@ -406,33 +417,38 @@ async function startEyeTracking() {
   // ── STEP 5: Poll gaze via getCurrentPrediction every 200ms ──
   console.log('[ARGUS] Starting gaze polling');
 
-  eyeTrackingInterval = setInterval(async function() {
+  eyeTrackingInterval = setInterval(function() {
     if (!examActive) return;
 
-    try {
-      var prediction = await webgazer.getCurrentPrediction();
-
+    webgazer.getCurrentPrediction().then(function(prediction) {
       if (!prediction) {
         console.log('[ARGUS] Prediction: null — face not detected');
         if (!lookAwayTimer) {
           lookAwayTimer = setTimeout(function() {
-            console.log('[ARGUS] FLAGGING: looking away (face lost for 3s)');
-            handleLookingAway('Student looked away from screen for 3+ seconds');
+            console.log('[ARGUS] FLAGGING: looking away (face lost for 2s)');
+            handleLookingAway('Student looked away from screen');
             lookAwayTimer = null;
           }, LOOK_AWAY_THRESHOLD_MS);
         }
         return;
       }
 
-      console.log('[ARGUS] Gaze:', Math.round(prediction.x), Math.round(prediction.y));
+      // Get actual viewport dimensions
+      var screenW = Math.max(document.documentElement.clientWidth, window.innerWidth || 0);
+      var screenH = Math.max(document.documentElement.clientHeight, window.innerHeight || 0);
 
-      var screenW = window.innerWidth;
-      var screenH = window.innerHeight;
+      // Asymmetric padding: 100px left/top/bottom, 200px right
+      var isOutside =
+        prediction.x < 100 ||
+        prediction.x > screenW - 200 ||
+        prediction.y < 100 ||
+        prediction.y > screenH - 100;
+
+      console.log('[ARGUS] Gaze:', Math.round(prediction.x), Math.round(prediction.y),
+        'Screen:', screenW, screenH, 'Outside:', isOutside);
 
       // ── OUTSIDE SCREEN BOUNDS ──
-      if (prediction.x < 0 || prediction.x > screenW ||
-          prediction.y < 0 || prediction.y > screenH) {
-        console.log('[ARGUS] Gaze OUTSIDE screen');
+      if (isOutside) {
         if (!lookAwayTimer) {
           lookAwayTimer = setTimeout(function() {
             console.log('[ARGUS] FLAGGING: gaze outside screen bounds');
@@ -452,10 +468,10 @@ async function startEyeTracking() {
         isLookingAway = false;
         updateEyeTrackingIndicator(false);
       }
-    } catch (e) {
+    }).catch(function() {
       // Silently ignore errors
-    }
-  }, 200);
+    });
+  }, 50);
 
   updateEyeTrackingIndicator(false);
   console.log('[ARGUS] ✅ Eye tracking fully active (polling mode).');
@@ -747,7 +763,7 @@ async function initFaceDetection() {
       if (!webcamVideo.srcObject) return;
       try {
         const detections = await faceapi.detectAllFaces(webcamVideo, new faceapi.TinyFaceDetectorOptions());
-        if (detections.length === 0) addFlag('no_face', 'No face detected in webcam feed');
+        if (detections.length === 0) addFlag('no_face', 'Student looked away from screen');
         else if (detections.length > 1) addFlag('multiple_faces', `Multiple faces detected (${detections.length} faces)`);
       } catch(e) {}
     }, 8000);
