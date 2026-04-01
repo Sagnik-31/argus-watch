@@ -209,6 +209,7 @@ let webcamStream = null;
 let proctoringAttached = false;
 let examActive = false;
 let fullscreenModalOpen = false;
+let fullscreenGracePeriod = false;
 let eyeTrackingFlagCount = 0;
 let eyeTrackingSuspicionBonus = 0;
 let lookAwayTimer = null;
@@ -670,6 +671,10 @@ function startExam() {
 
 // ── Fullscreen ──
 function enterFullscreen() {
+  // Set grace period to suppress false tab_switch flags during fullscreen transition
+  fullscreenGracePeriod = true;
+  setTimeout(() => { fullscreenGracePeriod = false; }, 2000);
+  console.log('[ARGUS] Fullscreen grace period started (2s)');
   const el = document.documentElement;
   (el.requestFullscreen || el.webkitRequestFullscreen || el.msRequestFullscreen || function(){}).call(el);
 }
@@ -847,7 +852,12 @@ function attachProctoring() {
   proctoringAttached = true;
 
   document.addEventListener('visibilitychange', () => {
-    if (document.hidden) addFlag('tab_switch', 'Student switched to another tab');
+    if (!examActive) return;
+    if (document.hidden && !fullscreenGracePeriod) {
+      addFlag('tab_switch', 'Student switched to another tab');
+    } else if (document.hidden && fullscreenGracePeriod) {
+      console.log('[ARGUS] Suppressed false tab_switch during fullscreen transition');
+    }
   });
 
   function onFullscreenChange() {
