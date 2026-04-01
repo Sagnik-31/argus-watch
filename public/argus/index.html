@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ARGUS — AI Proctoring System</title>
   <link rel="stylesheet" href="styles.css">
+  <script src="https://webgazer.cs.brown.edu/webgazer.js"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
 </head>
 <body>
@@ -28,8 +29,33 @@
     </div>
   </div>
 
+  <!-- ── Eye Tracking Calibration Screen ── -->
+  <div class="calibration-screen" id="calibrationScreen" style="display:none;">
+    <div class="calibration-header">
+      <span class="logo-icon">👁</span>
+      <div class="logo-text">ARGUS</div>
+      <div class="tagline">Eye Tracking Calibration</div>
+      <div class="calibration-subtitle">Click each dot 5 times to calibrate</div>
+      <div class="calibration-progress" id="calibrationProgress">Calibrated: 0/9 points</div>
+    </div>
+    <div class="calibration-grid" id="calibrationGrid">
+      <button class="calibration-dot" data-point="1" type="button"></button>
+      <button class="calibration-dot" data-point="2" type="button"></button>
+      <button class="calibration-dot" data-point="3" type="button"></button>
+      <button class="calibration-dot" data-point="4" type="button"></button>
+      <button class="calibration-dot" data-point="5" type="button"></button>
+      <button class="calibration-dot" data-point="6" type="button"></button>
+      <button class="calibration-dot" data-point="7" type="button"></button>
+      <button class="calibration-dot" data-point="8" type="button"></button>
+      <button class="calibration-dot" data-point="9" type="button"></button>
+    </div>
+  </div>
+
   <!-- ── Exam Screen ── -->
   <div class="exam-screen" id="examScreen">
+    <div class="eye-tracking-indicator active" id="eyeTrackingIndicator" title="Eye tracking active">
+      <span class="eye-tracking-icon">👁</span>
+    </div>
     <!-- Top Bar -->
     <div class="exam-topbar">
       <div class="topbar-left">
@@ -156,11 +182,22 @@ let webcamStream = null;
 let proctoringAttached = false;
 let examActive = false;
 let fullscreenModalOpen = false;
+let eyeTrackingFlagCount = 0;
+let eyeTrackingSuspicionBonus = 0;
+let lookAwayTimer = null;
+let isLookingAway = false;
+let calibratedPoints = 0;
+const calibrationClicks = {};
+const LOOK_AWAY_THRESHOLD_MS = 3000;
 
 // ── Elements ──
 const landingScreen = document.getElementById('landingScreen');
+const calibrationScreen = document.getElementById('calibrationScreen');
+const calibrationProgress = document.getElementById('calibrationProgress');
+const calibrationDots = Array.from(document.querySelectorAll('.calibration-dot'));
 const examScreen = document.getElementById('examScreen');
 const startExamBtn = document.getElementById('startExamBtn');
+const eyeTrackingIndicator = document.getElementById('eyeTrackingIndicator');
 const timerDisplay = document.getElementById('timerDisplay');
 const flagCountEl = document.getElementById('flagCount');
 const suspicionBadge = document.getElementById('suspicionBadge');
@@ -236,6 +273,122 @@ function formatType(type) {
   return map[type] || type;
 }
 
+function updateCalibrationProgress() {
+  calibrationProgress.textContent = `Calibrated: ${calibratedPoints}/9 points`;
+}
+
+function resetCalibration() {
+  calibratedPoints = 0;
+  calibrationDots.forEach(dot => {
+    const pointId = dot.dataset.point;
+    calibrationClicks[pointId] = 0;
+    dot.disabled = false;
+    dot.classList.remove('completed');
+  });
+  updateCalibrationProgress();
+}
+
+async function completeCalibrationAndStartExam() {
+  calibrationScreen.style.display = 'none';
+  startExam();
+  await startEyeTracking();
+}
+
+function startCalibrationFlow() {
+  resetCalibration();
+  landingScreen.style.display = 'none';
+  calibrationScreen.style.display = 'flex';
+}
+
+calibrationDots.forEach(dot => {
+  dot.addEventListener('click', () => {
+    const pointId = dot.dataset.point;
+    calibrationClicks[pointId] = (calibrationClicks[pointId] || 0) + 1;
+    if (calibrationClicks[pointId] >= 5 && !dot.classList.contains('completed')) {
+      dot.classList.add('completed');
+      dot.disabled = true;
+      calibratedPoints++;
+      updateCalibrationProgress();
+      if (calibratedPoints === 9) {
+        setTimeout(() => {
+          completeCalibrationAndStartExam();
+        }, 350);
+      }
+    }
+  });
+});
+
+function updateEyeTrackingIndicator(away) {
+  eyeTrackingIndicator.classList.toggle('away', away);
+  eyeTrackingIndicator.classList.toggle('active', !away);
+}
+
+function resetLookingAwayTimer() {
+  if (lookAwayTimer) {
+    clearTimeout(lookAwayTimer);
+    lookAwayTimer = null;
+  }
+  if (isLookingAway) {
+    isLookingAway = false;
+    updateEyeTrackingIndicator(false);
+  }
+}
+
+function handleLookingAway() {
+  if (lookAwayTimer) return;
+  isLookingAway = true;
+  updateEyeTrackingIndicator(true);
+  lookAwayTimer = setTimeout(() => {
+    lookAwayTimer = null;
+    addFlag('eye_movement', 'Student looked away from screen for 3+ seconds');
+    showWarning('ARGUS detected you looking away from screen');
+    eyeTrackingFlagCount++;
+    localStorage.setItem('eyeTrackingFlags', String(eyeTrackingFlagCount));
+    if (eyeTrackingFlagCount % 3 === 0) {
+      eyeTrackingSuspicionBonus += 15;
+      localStorage.setItem('argus_eye_suspicion_bonus', String(eyeTrackingSuspicionBonus));
+    }
+  }, LOOK_AWAY_THRESHOLD_MS);
+}
+
+async function startEyeTracking() {
+  if (typeof webgazer === 'undefined') {
+    console.warn('webgazer.js not loaded');
+    return;
+  }
+  const setListener = webgazer.setGazerListener || webgazer.setGazeListener;
+  if (!setListener) {
+    console.warn('webgazer listener method missing');
+    return;
+  }
+
+  setListener.call(webgazer, (data, clock) => {
+    if (data == null || !examActive) return;
+    const screenW = window.innerWidth;
+    const screenH = window.innerHeight;
+    if (data.x < 0 || data.x > screenW || data.y < 0 || data.y > screenH) {
+      handleLookingAway();
+    } else {
+      resetLookingAwayTimer();
+    }
+  });
+
+  await webgazer.begin();
+  const videoContainer = document.getElementById('webgazerVideoContainer');
+  const faceOverlay = document.getElementById('webgazerFaceOverlay');
+  if (videoContainer) videoContainer.style.display = 'none';
+  if (faceOverlay) faceOverlay.style.display = 'none';
+  updateEyeTrackingIndicator(false);
+}
+
+function stopEyeTracking() {
+  resetLookingAwayTimer();
+  updateEyeTrackingIndicator(false);
+  if (typeof webgazer !== 'undefined' && typeof webgazer.end === 'function') {
+    try { webgazer.end(); } catch (_) {}
+  }
+}
+
 // ── Start Exam ──
 startExamBtn.addEventListener('click', async () => {
   studentName = document.getElementById('studentName').value.trim();
@@ -251,7 +404,7 @@ startExamBtn.addEventListener('click', async () => {
 
   try {
     await ensureCameraPermission();
-    startExam();
+    startCalibrationFlow();
   } catch (e) {
     alert('Camera permission is required to start the exam.');
   } finally {
@@ -273,6 +426,10 @@ function startExam() {
   timerSeconds = EXAM_DURATION;
   warningQueue = [];
   showingWarning = false;
+  eyeTrackingFlagCount = 0;
+  eyeTrackingSuspicionBonus = 0;
+  localStorage.setItem('eyeTrackingFlags', '0');
+  localStorage.setItem('argus_eye_suspicion_bonus', '0');
 
   flagCountEl.textContent = '0';
   suspicionBadge.className = 'suspicion-badge';
@@ -287,6 +444,7 @@ function startExam() {
 
   // Only transition to the exam screen after permission + credentials
   landingScreen.style.display = 'none';
+  calibrationScreen.style.display = 'none';
   examScreen.style.display = 'block';
 
   // Attach stream once we show the exam UI
@@ -519,6 +677,7 @@ function endExam() {
   clearInterval(timerInterval);
   clearInterval(snapshotInterval);
   if (faceDetectionInterval) clearInterval(faceDetectionInterval);
+  stopEyeTracking();
 
   captureSnapshot('exam_end');
 
@@ -526,6 +685,7 @@ function endExam() {
   localStorage.setItem('argus_duration', duration.toString());
   localStorage.setItem('argus_flags', JSON.stringify(flags));
   localStorage.setItem('argus_snapshots', JSON.stringify(snapshots));
+  localStorage.setItem('eyeTrackingFlags', String(eyeTrackingFlagCount));
 
   if (webcamVideo.srcObject) webcamVideo.srcObject.getTracks().forEach(t => t.stop());
   if (document.fullscreenElement) document.exitFullscreen();

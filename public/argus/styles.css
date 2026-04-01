@@ -163,6 +163,113 @@ body {
   box-shadow: 0 6px 24px var(--danger-glow);
 }
 
+/* ── Eye Tracking Calibration ── */
+.calibration-screen {
+  min-height: 100vh;
+  background: radial-gradient(circle at 50% 0%, rgba(33,150,243,0.12) 0%, transparent 55%),
+              var(--bg-primary);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  padding: 32px;
+}
+
+.calibration-header {
+  text-align: center;
+  margin-bottom: 28px;
+}
+
+.calibration-header .logo-icon {
+  font-size: 48px;
+  margin-bottom: 4px;
+}
+
+.calibration-header .logo-text {
+  font-size: 28px;
+  letter-spacing: 6px;
+}
+
+.calibration-header .tagline {
+  margin-bottom: 8px;
+}
+
+.calibration-subtitle {
+  color: var(--text-secondary);
+  font-size: 14px;
+  margin-bottom: 8px;
+}
+
+.calibration-progress {
+  color: var(--accent);
+  font-size: 13px;
+  letter-spacing: 0.8px;
+}
+
+.calibration-grid {
+  width: min(90vw, 900px);
+  height: min(65vh, 520px);
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(3, 1fr);
+  gap: clamp(70px, 9vw, 140px);
+  justify-items: center;
+  align-items: center;
+}
+
+.calibration-dot {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: none;
+  background: #ef4444;
+  box-shadow: 0 0 0 8px rgba(239,68,68,0.15), 0 0 16px rgba(239,68,68,0.35);
+  cursor: pointer;
+  transition: transform 0.15s ease, background 0.2s ease, box-shadow 0.2s ease;
+}
+
+.calibration-dot:hover {
+  transform: scale(1.12);
+}
+
+.calibration-dot.completed {
+  background: #22c55e;
+  box-shadow: 0 0 0 8px rgba(34,197,94,0.15), 0 0 18px rgba(34,197,94,0.4);
+  cursor: default;
+}
+
+/* ── Eye Tracking Indicator ── */
+.eye-tracking-indicator {
+  position: fixed;
+  top: 66px;
+  left: 18px;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 1px solid rgba(255,255,255,0.16);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 250;
+  background: rgba(15, 23, 36, 0.92);
+  transition: border-color 0.2s, box-shadow 0.2s, transform 0.2s;
+}
+
+.eye-tracking-icon {
+  font-size: 18px;
+  line-height: 1;
+}
+
+.eye-tracking-indicator.active {
+  border-color: rgba(34,197,94,0.6);
+  box-shadow: 0 0 12px rgba(34,197,94,0.35);
+}
+
+.eye-tracking-indicator.away {
+  border-color: rgba(239,68,68,0.7);
+  box-shadow: 0 0 14px rgba(239,68,68,0.45);
+}
+
 /* ── Exam Interface ── */
 .exam-screen {
   display: none;
