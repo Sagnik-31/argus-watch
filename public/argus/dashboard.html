@@ -62,6 +62,9 @@
         </div>
       </div>
 
+      <!-- Recalibration Notifications -->
+      <div id="recalibNotifications" style="display:none; margin-bottom:20px;"></div>
+
       <!-- Webcam Snapshots -->
       <div class="section-title">📸 Webcam Snapshots</div>
       <div class="snapshots-gallery" id="snapshotsGallery">
@@ -153,7 +156,8 @@ function loadDashboard() {
 
   const scoreMap = {
     'tab_switch': 15, 'fullscreen_exit': 15, 'copy_attempt': 20,
-    'right_click': 10, 'multiple_faces': 25, 'no_face': 10, 'gaze_away': 8
+    'right_click': 10, 'multiple_faces': 25, 'no_face': 10, 'gaze_away': 8,
+    'recalibration_requested': 5, 'recalibration_complete': 0
   };
   let score = 0;
   flags.forEach(f => { score += scoreMap[f.type] || 10; });
@@ -177,7 +181,7 @@ function loadDashboard() {
     tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:24px;color:var(--text-muted);">No flags recorded — student appears clean</td></tr>';
   } else {
     tbody.innerHTML = flags.map((f, i) => {
-      const severe = ['multiple_faces', 'copy_attempt'].includes(f.type);
+      const severe = ['multiple_faces', 'copy_attempt', 'recalibration_requested'].includes(f.type);
       return `<tr>
         <td>${i + 1}</td>
         <td>${new Date(f.timestamp).toLocaleTimeString()}</td>
@@ -203,6 +207,21 @@ function loadDashboard() {
         </div>
       </div>`;
     }).join('');
+  }
+
+  // Recalibration notifications
+  var recalibEvents = JSON.parse(localStorage.getItem('argus_recalibrations') || '[]');
+  var recalibContainer = document.getElementById('recalibNotifications');
+  if (recalibEvents.length > 0) {
+    recalibContainer.style.display = 'block';
+    recalibContainer.innerHTML = recalibEvents.map(function(evt) {
+      return '<div style="background:rgba(245,158,11,0.1);border:1px solid var(--warning);border-radius:12px;padding:14px 20px;margin-bottom:8px;display:flex;align-items:center;gap:10px;">' +
+        '<span style="font-size:20px;">⚠️</span>' +
+        '<span style="color:var(--warning);font-size:13px;font-weight:500;">Student ' + (evt.student || student) + ' requested recalibration at ' + new Date(evt.timestamp).toLocaleTimeString() + '</span>' +
+      '</div>';
+    }).join('');
+  } else {
+    recalibContainer.style.display = 'none';
   }
 }
 
