@@ -7,7 +7,7 @@
   <link rel="stylesheet" href="styles.css">
   <script src="https://cdn.jsdelivr.net/npm/webgazer@2.0.1/dist/webgazer.min.js"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
 </head>
 <body>
 
@@ -170,21 +170,7 @@
 // ARGUS — Student Proctoring Client
 // ══════════════════════════════════════════
 
-// ── Supabase Configuration ──
-const supabaseUrl = 'https://gqwgxwbatzsdecichvdm.supabase.co';
-const supabaseKey = 'sb_publishable_Kp42-O6ZPcngn_RRYirShg_1DLkFXNu';
-let supabase = null;
-try {
-  if (window.supabase && window.supabase.createClient) {
-    supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
-    console.log('[ARGUS] Supabase client initialized successfully');
-  } else {
-    console.warn('[ARGUS] Supabase SDK not loaded — running in localStorage-only mode');
-  }
-} catch (e) {
-  console.warn('[ARGUS] Failed to initialize Supabase:', e.message);
-}
-let currentSessionId = null;
+
 
 const EXAM_DURATION = 30 * 60;
 const SNAPSHOT_INTERVAL = 30000; // 30 seconds
@@ -918,97 +904,7 @@ document.getElementById('faceAlignContinueBtn').addEventListener('click', () => 
   startCalibrationFlow();
 });
 
-// ── Supabase Database Functions ──
-async function createExamSession(studentName, examCode) {
-  if (!supabase) return null;
-  try {
-    const { data, error } = await supabase
-      .from('exam_sessions')
-      .insert({
-        student_name: studentName,
-        exam_code: examCode,
-        started_at: new Date().toISOString()
-      })
-      .select();
 
-    if (error) {
-      console.error('[ARGUS] Supabase crate session error:', error);
-      return null;
-    }
-
-    currentSessionId = data[0].id;
-    localStorage.setItem('argus_current_session_id', currentSessionId);
-    console.log('[ARGUS] Supabase session created:', currentSessionId);
-    return currentSessionId;
-  } catch (e) {
-    console.warn('[ARGUS] Failed to create Supabase session:', e);
-    return null;
-  }
-}
-
-async function saveFlagToSupabase(type, detail, elapsedSecs, snapshotUrl) {
-  if (!supabase || !currentSessionId) return;
-  try {
-    // Only save snapshot URL if it's not a giant base64 or if we really want to
-    // We'll pass null for now to avoid huge DB rows, we'll store snapshots in the snapshots table
-    await supabase.from('flags').insert({
-      session_id: currentSessionId,
-      flag_type: type,
-      detail: detail,
-      timestamp: new Date().toISOString(),
-      elapsed_seconds: elapsedSecs,
-      snapshot_url: null 
-    });
-  } catch (e) {
-    console.warn('[ARGUS] Failed to save flag to Supabase:', e);
-  }
-}
-
-async function saveSnapshotToSupabase(reason, dataUrl, elapsedSecs) {
-  if (!supabase || !currentSessionId) return;
-  try {
-    await supabase.from('snapshots').insert({
-      session_id: currentSessionId,
-      image_data: dataUrl,
-      captured_at: new Date().toISOString(),
-      elapsed_seconds: elapsedSecs,
-      reason: reason
-    });
-  } catch (e) {
-    console.warn('[ARGUS] Failed to save snapshot to Supabase:', e);
-  }
-}
-
-async function updateExamSessionReferencePhoto(dataUrl) {
-  if (!supabase || !currentSessionId) return;
-  try {
-    await supabase
-      .from('exam_sessions')
-      .update({ reference_snapshot: dataUrl })
-      .eq('id', currentSessionId);
-  } catch (e) {
-    console.warn('[ARGUS] Failed to update reference photo in Supabase:', e);
-  }
-}
-
-async function endExamSession(score, verdict, durationSecs) {
-  if (!supabase || !currentSessionId) return;
-  try {
-    await supabase
-      .from('exam_sessions')
-      .update({
-        ended_at: new Date().toISOString(),
-        duration_seconds: durationSecs,
-        suspicion_score: score,
-        total_flags: flagCount,
-        verdict: verdict
-      })
-      .eq('id', currentSessionId);
-    console.log('[ARGUS] Supabase session ended completely');
-  } catch (e) {
-    console.warn('[ARGUS] Failed to end Supabase session:', e);
-  }
-}
 
 async function startExam() {
   if (!webcamStream) {
@@ -1052,8 +948,7 @@ async function startExam() {
   examStartTime = Date.now();
   examActive = true;
 
-  // Supabase: Create session in DB
-  createExamSession(studentName, examCode);
+
 
   // Fullscreen should be activated after permission + credentials
   enterFullscreen();
@@ -1114,8 +1009,7 @@ function captureSnapshot(reason) {
   if (snapshots.length > 40) snapshots.shift();
   localStorage.setItem('argus_snapshots', JSON.stringify(snapshots));
 
-  // Supabase: Save snapshot to DB
-  saveSnapshotToSupabase(reason, dataUrl, elapsedSecs);
+
 }
 
 // ── Timer ──
@@ -1155,8 +1049,7 @@ function addFlag(type, detail) {
 
   localStorage.setItem('argus_flags', JSON.stringify(flags));
 
-  // Supabase: Save flag to DB
-  saveFlagToSupabase(type, detail, elapsedSecs, null);
+
 
   // Capture snapshot on flag
   captureSnapshot('flag_' + type);
@@ -1520,8 +1413,7 @@ async function captureReferenceFace() {
         localStorage.setItem('argus_reference_snapshot', refSnapshot);
         console.log('[ARGUS] Reference face snapshot stored');
 
-        // Supabase: Update session with reference photo
-        updateExamSessionReferencePhoto(refSnapshot);
+
       } catch (snapErr) {
         console.warn('[ARGUS] Could not store reference snapshot:', snapErr);
       }
@@ -1639,8 +1531,7 @@ function endExam() {
   if (score > 50) tempVerdict = 'HIGH RISK';
   else if (score > 20) tempVerdict = 'SUSPICIOUS';
 
-  // Supabase: End session in DB
-  endExamSession(score, tempVerdict, durationSecs);
+
 
   if (webcamVideo.srcObject) webcamVideo.srcObject.getTracks().forEach(t => t.stop());
 

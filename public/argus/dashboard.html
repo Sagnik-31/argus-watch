@@ -6,7 +6,7 @@
   <title>ARGUS — Invigilator Dashboard</title>
   <link rel="stylesheet" href="styles.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
 </head>
 <body>
 
@@ -140,11 +140,7 @@
 // ARGUS — Invigilator Dashboard
 // ══════════════════════════════════════════
 
-// ── Supabase Configuration ──
-const supabaseUrl = 'https://gqwgxwbatzsdecichvdm.supabase.co';
-const supabaseKey = 'sb_publishable_Kp42-O6ZPcngn_RRYirShg_1DLkFXNu';
-const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
-let realtimeChannel = null;
+
 
 const OPENROUTER_API_KEY = "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";
 
@@ -164,7 +160,6 @@ loginBtn.addEventListener('click', () => {
   loginScreen.style.display = 'none';
   dashboard.style.display = 'block';
   loadDashboard();
-  startRealtimeFlags();
 });
 
 document.getElementById('adminPassword').addEventListener('keydown', (e) => {
@@ -452,8 +447,7 @@ DETAILS: [bullet points of concerns]`;
 
     displayReport(text);
 
-    // Save AI report to Supabase
-    saveAiReportToSupabase(text);
+
 
   } catch (error) {
     console.error('Fetch error:', error);
@@ -524,84 +518,7 @@ downloadPdfBtn.addEventListener('click', () => {
   doc.save(`ARGUS_Report_${student.replace(/\s+/g, '_')}.pdf`);
 });
 
-// ══════════════════════════════════════════
-// REAL-TIME FLAG MONITORING (STEP 8)
-// ══════════════════════════════════════════
-function startRealtimeFlags() {
-  const currentSessionId = localStorage.getItem('argus_current_session_id');
-  if (!currentSessionId) {
-    console.log('[ARGUS Dashboard] No current session ID found for realtime');
-    return;
-  }
 
-  const feedContainer = document.getElementById('realtimeFlagFeed');
-  const entriesEl = document.getElementById('realtimeFlagEntries');
-
-  realtimeChannel = supabase
-    .channel('dashboard-flags-live')
-    .on('postgres_changes', {
-      event: 'INSERT',
-      schema: 'public',
-      table: 'flags',
-      filter: 'session_id=eq.' + currentSessionId
-    }, (payload) => {
-      console.log('[ARGUS Dashboard] New flag (realtime):', payload);
-      feedContainer.style.display = 'block';
-
-      const flag = payload.new;
-      const isSevere = ['face_mismatch', 'multiple_faces', 'copy_attempt'].includes(flag.flag_type);
-
-      const entry = document.createElement('div');
-      entry.style.cssText = 'display:flex;align-items:center;gap:12px;padding:12px 18px;border-bottom:1px solid var(--border);animation:fadeUp 0.4s ease-out;';
-      entry.innerHTML = `
-        <div style="width:8px;height:8px;border-radius:50%;background:${isSevere ? 'var(--danger)' : 'var(--accent)'};flex-shrink:0;${isSevere ? 'box-shadow:0 0 6px rgba(239,68,68,0.5);' : ''}"></div>
-        <span class="flag-type-badge ${isSevere ? 'severe' : ''}" style="${flag.flag_type === 'face_mismatch' ? 'background:#ff1744;color:#fff;' : ''}">${(flag.flag_type || '').replace(/_/g, ' ')}</span>
-        <span style="font-size:12px;color:var(--text-muted);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${flag.detail || ''}</span>
-        <span style="font-size:11px;color:var(--text-muted);flex-shrink:0;font-variant-numeric:tabular-nums;">${new Date().toLocaleTimeString()}</span>
-      `;
-
-      entriesEl.insertBefore(entry, entriesEl.firstChild);
-
-      // Also update flag count in the dashboard stats
-      const flagCountEl = document.getElementById('dashFlagCount');
-      const currentCount = parseInt(flagCountEl.textContent) || 0;
-      flagCountEl.textContent = currentCount + 1;
-
-      // Keep only last 30 entries
-      while (entriesEl.children.length > 30) {
-        entriesEl.removeChild(entriesEl.lastChild);
-      }
-    })
-    .subscribe((status) => {
-      console.log('[ARGUS Dashboard] Realtime subscription status:', status);
-    });
-}
-
-// ══════════════════════════════════════════
-// SAVE AI REPORT TO SUPABASE
-// ══════════════════════════════════════════
-async function saveAiReportToSupabase(reportText) {
-  const sessionId = localStorage.getItem('argus_current_session_id');
-  if (!sessionId) {
-    console.log('[ARGUS Dashboard] No session ID, skipping Supabase AI report save');
-    return;
-  }
-
-  try {
-    const { error } = await supabase
-      .from('exam_sessions')
-      .update({ ai_report: reportText })
-      .eq('id', sessionId);
-
-    if (error) {
-      console.error('[ARGUS Dashboard] Failed to save AI report:', error);
-    } else {
-      console.log('[ARGUS Dashboard] AI report saved to Supabase');
-    }
-  } catch (e) {
-    console.warn('[ARGUS Dashboard] Error saving AI report:', e);
-  }
-}
 </script>
 </body>
 </html>

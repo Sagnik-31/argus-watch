@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ARGUS — Admin Panel</title>
   <link rel="stylesheet" href="styles.css">
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
 
@@ -32,7 +31,7 @@
         <span class="topbar-logo">👁</span>
         <div>
           <div class="topbar-title">ARGUS</div>
-          <div class="dash-subtitle">Admin Panel — All Sessions</div>
+          <div class="dash-subtitle">Admin Panel — Current Session</div>
         </div>
       </div>
       <div style="display:flex;gap:12px;align-items:center;">
@@ -47,146 +46,64 @@
       <!-- Summary Stats -->
       <div class="stats-grid" id="summaryStats">
         <div class="stat-card">
-          <div class="stat-label">Total Exams</div>
-          <div class="stat-value" id="statTotalExams" style="color:var(--accent);">—</div>
+          <div class="stat-label">Student</div>
+          <div class="stat-value" id="statStudent" style="font-size:22px;">—</div>
         </div>
         <div class="stat-card">
-          <div class="stat-label">Avg Suspicion Score</div>
-          <div class="stat-value" id="statAvgScore">—</div>
+          <div class="stat-label">Exam Code</div>
+          <div class="stat-value" id="statExamCode" style="color:var(--accent);font-size:22px;">—</div>
         </div>
         <div class="stat-card">
-          <div class="stat-label">High Risk</div>
-          <div class="stat-value" id="statHighRisk" style="color:var(--danger);">—</div>
+          <div class="stat-label">Total Flags</div>
+          <div class="stat-value" id="statTotalFlags" style="color:var(--danger);">—</div>
         </div>
         <div class="stat-card">
-          <div class="stat-label">Clean</div>
-          <div class="stat-value" id="statClean" style="color:var(--success);">—</div>
+          <div class="stat-label">Suspicion Score</div>
+          <div class="stat-value" id="statScore">—</div>
+          <div id="statRiskBadge" class="risk-badge green" style="margin-top:8px;">CLEAN</div>
         </div>
       </div>
 
-      <!-- Real-time Activity Feed -->
-      <div class="realtime-feed" id="realtimeFeed" style="display:none;">
-        <div class="section-title">🔴 Live Activity Feed</div>
-        <div class="realtime-entries" id="realtimeEntries"></div>
-      </div>
-
-      <!-- Filters -->
-      <div class="admin-filters">
-        <div class="filter-row">
-          <div class="filter-group">
-            <label>Student Name</label>
-            <input type="text" id="filterStudent" placeholder="Search student..." autocomplete="off">
+      <!-- Reference Face -->
+      <div id="adminRefFace" style="display:none; margin-bottom:24px;">
+        <div class="section-title">🪪 Registered Identity</div>
+        <div style="display:flex;align-items:center;gap:20px;background:var(--bg-secondary);border:1px solid var(--border);border-radius:14px;padding:16px 20px;">
+          <img id="adminRefImg" src="" alt="Reference Face" style="width:120px;height:90px;object-fit:cover;border-radius:10px;border:2px solid var(--accent);">
+          <div>
+            <div style="font-weight:600;color:var(--text-primary);font-size:15px;">📸 Reference Face</div>
+            <div style="color:var(--text-muted);font-size:13px;margin-top:4px;">Captured at exam start for identity verification</div>
           </div>
-          <div class="filter-group">
-            <label>Exam Code</label>
-            <input type="text" id="filterExamCode" placeholder="Filter by exam code..." autocomplete="off">
-          </div>
-          <div class="filter-group">
-            <label>Verdict</label>
-            <select id="filterVerdict">
-              <option value="">All Verdicts</option>
-              <option value="CLEAN">Clean</option>
-              <option value="SUSPICIOUS">Suspicious</option>
-              <option value="HIGH RISK">High Risk</option>
-            </select>
-          </div>
-          <div class="filter-group">
-            <label>Date From</label>
-            <input type="date" id="filterDateFrom">
-          </div>
-          <div class="filter-group">
-            <label>Date To</label>
-            <input type="date" id="filterDateTo">
-          </div>
-          <button class="btn-primary filter-apply-btn" id="applyFiltersBtn">Apply Filters</button>
-          <button class="btn-outline filter-clear-btn" id="clearFiltersBtn">Clear</button>
         </div>
       </div>
 
-      <!-- Sessions Table -->
-      <div class="section-title">📋 Exam Sessions <span class="session-count" id="sessionCount"></span></div>
+      <!-- Flags Table -->
+      <div class="section-title">🚩 Flagged Events</div>
       <div class="admin-table-wrap">
-        <table class="admin-table" id="sessionsTable">
-          <thead>
-            <tr>
-              <th>Student</th>
-              <th>Exam Code</th>
-              <th>Date & Time</th>
-              <th>Duration</th>
-              <th>Flags</th>
-              <th>Score</th>
-              <th>Verdict</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody id="sessionsBody">
-            <tr><td colspan="8" class="table-empty">Loading sessions...</td></tr>
-          </tbody>
-        </table>
-      </div>
-
-      <!-- Loading indicator -->
-      <div class="admin-loading" id="adminLoading" style="display:none;">
-        <span class="spinner"></span> Loading sessions from database...
-      </div>
-    </div>
-  </div>
-
-  <!-- ── Session Detail Modal ── -->
-  <div class="session-detail-overlay" id="sessionDetailOverlay" style="display:none;">
-    <div class="session-detail-panel">
-      <div class="detail-header">
-        <div>
-          <div class="detail-title" id="detailTitle">Session Details</div>
-          <div class="detail-subtitle" id="detailSubtitle"></div>
-        </div>
-        <button class="detail-close-btn" id="detailCloseBtn">✕</button>
-      </div>
-
-      <div class="detail-body" id="detailBody">
-        <!-- Stats row -->
-        <div class="detail-stats" id="detailStats"></div>
-
-        <!-- Reference Face -->
-        <div id="detailRefFace" style="display:none;">
-          <div class="section-title">🪪 Registered Identity</div>
-          <div class="detail-ref-face-card">
-            <img id="detailRefImg" src="" alt="Reference Face">
-            <div>
-              <div style="font-weight:600;color:var(--text-primary);font-size:15px;">📸 Reference Face</div>
-              <div style="color:var(--text-muted);font-size:13px;margin-top:4px;">Captured at exam start</div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Flags -->
-        <div class="section-title">🚩 Flagged Events</div>
-        <table class="flags-table" id="detailFlagsTable">
+        <table class="admin-table" id="flagsTable">
           <thead>
             <tr>
               <th>#</th>
-              <th>Time</th>
+              <th>Timestamp</th>
               <th>Elapsed</th>
               <th>Type</th>
               <th>Detail</th>
             </tr>
           </thead>
-          <tbody id="detailFlagsBody">
-            <tr><td colspan="5" class="table-empty">Loading flags...</td></tr>
+          <tbody id="flagsBody">
+            <tr><td colspan="5" class="table-empty">No flags recorded</td></tr>
           </tbody>
         </table>
+      </div>
 
-        <!-- Snapshots -->
-        <div class="section-title">📸 Webcam Snapshots</div>
-        <div class="snapshots-gallery" id="detailSnapshots">
-          <div class="snapshot-empty">Loading snapshots...</div>
-        </div>
+      <!-- Snapshots -->
+      <div class="section-title">📸 Webcam Snapshots</div>
+      <div class="snapshots-gallery" id="snapshotsGallery">
+        <div class="snapshot-empty">No snapshots captured</div>
+      </div>
 
-        <!-- AI Report -->
-        <div id="detailAiSection" style="display:none;">
-          <div class="section-title">🤖 AI Analysis Report</div>
-          <div class="detail-ai-report" id="detailAiReport"></div>
-        </div>
+      <!-- Loading indicator -->
+      <div class="admin-loading" id="adminLoading" style="display:none;">
+        <span class="spinner"></span> Loading session data...
       </div>
     </div>
   </div>
@@ -202,13 +119,8 @@
 
 <script>
 // ══════════════════════════════════════════
-// ARGUS — Admin Panel
+// ARGUS — Admin Panel (localStorage mode)
 // ══════════════════════════════════════════
-
-// ── Supabase Configuration ──
-const supabaseUrl = 'https://gqwgxwbatzsdecichvdm.supabase.co';
-const supabaseKey = 'sb_publishable_Kp42-O6ZPcngn_RRYirShg_1DLkFXNu';
-const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
 
 // ── Elements ──
 const loginScreen = document.getElementById('loginScreen');
@@ -217,17 +129,13 @@ const loginBtn = document.getElementById('loginBtn');
 const logoutBtn = document.getElementById('logoutBtn');
 const refreshBtn = document.getElementById('refreshBtn');
 
-let allSessions = [];
-let realtimeChannel = null;
-
 // ── Login ──
 loginBtn.addEventListener('click', () => {
   const pw = document.getElementById('adminPassword').value;
   if (pw !== 'admin123') { alert('Invalid password.'); return; }
   loginScreen.style.display = 'none';
   adminPanel.style.display = 'block';
-  loadAllSessions();
-  startRealtimeMonitoring();
+  loadSessionData();
 });
 
 document.getElementById('adminPassword').addEventListener('keydown', (e) => {
@@ -237,382 +145,95 @@ document.getElementById('adminPassword').addEventListener('keydown', (e) => {
 logoutBtn.addEventListener('click', () => {
   adminPanel.style.display = 'none';
   loginScreen.style.display = 'flex';
-  if (realtimeChannel) {
-    supabase.removeChannel(realtimeChannel);
-    realtimeChannel = null;
-  }
 });
 
 refreshBtn.addEventListener('click', () => {
-  loadAllSessions();
+  loadSessionData();
 });
 
-// ── Filters ──
-document.getElementById('applyFiltersBtn').addEventListener('click', () => {
-  applyFilters();
-});
-
-document.getElementById('clearFiltersBtn').addEventListener('click', () => {
-  document.getElementById('filterStudent').value = '';
-  document.getElementById('filterExamCode').value = '';
-  document.getElementById('filterVerdict').value = '';
-  document.getElementById('filterDateFrom').value = '';
-  document.getElementById('filterDateTo').value = '';
-  renderSessions(allSessions);
-});
-
-// Quick filter on Enter key
-['filterStudent', 'filterExamCode'].forEach(id => {
-  document.getElementById(id).addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') applyFilters();
-  });
-});
-
-function applyFilters() {
-  const studentFilter = document.getElementById('filterStudent').value.toLowerCase().trim();
-  const examCodeFilter = document.getElementById('filterExamCode').value.toLowerCase().trim();
-  const verdictFilter = document.getElementById('filterVerdict').value;
-  const dateFrom = document.getElementById('filterDateFrom').value;
-  const dateTo = document.getElementById('filterDateTo').value;
-
-  let filtered = allSessions;
-
-  if (studentFilter) {
-    filtered = filtered.filter(s => (s.student_name || '').toLowerCase().includes(studentFilter));
-  }
-  if (examCodeFilter) {
-    filtered = filtered.filter(s => (s.exam_code || '').toLowerCase().includes(examCodeFilter));
-  }
-  if (verdictFilter) {
-    filtered = filtered.filter(s => (s.verdict || '').toUpperCase() === verdictFilter);
-  }
-  if (dateFrom) {
-    const from = new Date(dateFrom);
-    filtered = filtered.filter(s => new Date(s.started_at) >= from);
-  }
-  if (dateTo) {
-    const to = new Date(dateTo);
-    to.setHours(23, 59, 59, 999);
-    filtered = filtered.filter(s => new Date(s.started_at) <= to);
-  }
-
-  renderSessions(filtered);
-}
-
 // ══════════════════════════════════════════
-// LOAD ALL SESSIONS
+// LOAD SESSION DATA FROM LOCALSTORAGE
 // ══════════════════════════════════════════
-async function loadAllSessions() {
-  document.getElementById('adminLoading').style.display = 'flex';
-
-  try {
-    // Fetch all sessions, newest first
-    const { data: sessions, error } = await supabase
-      .from('exam_sessions')
-      .select('*')
-      .order('started_at', { ascending: false });
-
-    if (error) {
-      console.error('[ARGUS Admin] Error loading sessions:', error);
-      document.getElementById('sessionsBody').innerHTML =
-        '<tr><td colspan="8" class="table-empty">Error loading sessions: ' + error.message + '</td></tr>';
-      return;
-    }
-
-    // For each session, get the flag count
-    const sessionIds = sessions.map(s => s.id);
-    let flagCounts = {};
-
-    if (sessionIds.length > 0) {
-      const { data: flags, error: flagErr } = await supabase
-        .from('flags')
-        .select('session_id');
-
-      if (!flagErr && flags) {
-        flags.forEach(f => {
-          flagCounts[f.session_id] = (flagCounts[f.session_id] || 0) + 1;
-        });
-      }
-    }
-
-    // Attach flag counts to sessions
-    sessions.forEach(s => {
-      s._flagCount = flagCounts[s.id] || s.total_flags || 0;
-    });
-
-    allSessions = sessions;
-    renderSummaryStats(sessions);
-    renderSessions(sessions);
-
-  } catch (e) {
-    console.error('[ARGUS Admin] Fetch error:', e);
-    document.getElementById('sessionsBody').innerHTML =
-      '<tr><td colspan="8" class="table-empty">Failed to connect to database</td></tr>';
-  } finally {
-    document.getElementById('adminLoading').style.display = 'none';
-  }
-}
-
-// ══════════════════════════════════════════
-// RENDER SUMMARY STATS
-// ══════════════════════════════════════════
-function renderSummaryStats(sessions) {
-  const total = sessions.length;
-  const scores = sessions.filter(s => s.suspicion_score != null).map(s => s.suspicion_score);
-  const avg = scores.length > 0 ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : 0;
-  const highRisk = sessions.filter(s => (s.verdict || '').toUpperCase() === 'HIGH RISK').length;
-  const clean = sessions.filter(s => (s.verdict || '').toUpperCase() === 'CLEAN').length;
-
-  document.getElementById('statTotalExams').textContent = total;
-
-  const avgEl = document.getElementById('statAvgScore');
-  avgEl.textContent = avg + '/100';
-  if (avg <= 20) avgEl.className = 'stat-value risk-green';
-  else if (avg <= 50) avgEl.className = 'stat-value risk-yellow';
-  else avgEl.className = 'stat-value risk-red';
-
-  document.getElementById('statHighRisk').textContent = highRisk;
-  document.getElementById('statClean').textContent = clean;
-}
-
-// ══════════════════════════════════════════
-// RENDER SESSIONS TABLE
-// ══════════════════════════════════════════
-function renderSessions(sessions) {
-  const tbody = document.getElementById('sessionsBody');
-  const countEl = document.getElementById('sessionCount');
-  countEl.textContent = '(' + sessions.length + ')';
-
-  if (sessions.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="8" class="table-empty">No sessions found</td></tr>';
-    return;
-  }
-
-  tbody.innerHTML = sessions.map(s => {
-    const verdict = (s.verdict || 'PENDING').toUpperCase();
-    let verdictClass = 'verdict-pending';
-    if (verdict === 'CLEAN') verdictClass = 'verdict-clean';
-    else if (verdict === 'SUSPICIOUS') verdictClass = 'verdict-suspicious';
-    else if (verdict === 'HIGH RISK') verdictClass = 'verdict-highrisk';
-
-    const isActive = s.started_at && !s.ended_at;
-    const duration = s.duration_seconds ? formatDuration(s.duration_seconds) : (isActive ? '⏱ In Progress' : '—');
-    const startTime = s.started_at ? new Date(s.started_at).toLocaleString() : '—';
-    const score = s.suspicion_score != null ? s.suspicion_score : '—';
-
-    return `<tr class="${isActive ? 'session-active' : ''}" data-session-id="${s.id}">
-      <td><strong>${escapeHtml(s.student_name || 'Unknown')}</strong></td>
-      <td><span class="exam-code-badge">${escapeHtml(s.exam_code || '—')}</span></td>
-      <td>${startTime}</td>
-      <td>${duration}</td>
-      <td><span class="flag-count-badge">${s._flagCount}</span></td>
-      <td>${score}</td>
-      <td><span class="verdict-badge ${verdictClass}">${verdict}</span></td>
-      <td><button class="btn-view-detail" onclick="viewSessionDetail('${s.id}')">View Details</button></td>
-    </tr>`;
-  }).join('');
-}
-
-// ══════════════════════════════════════════
-// SESSION DETAIL VIEW
-// ══════════════════════════════════════════
-async function viewSessionDetail(sessionId) {
-  const overlay = document.getElementById('sessionDetailOverlay');
-  overlay.style.display = 'flex';
-
-  // Find session data
-  const session = allSessions.find(s => s.id === sessionId);
-  if (!session) {
-    document.getElementById('detailBody').innerHTML = '<p style="color:var(--text-muted);padding:32px;text-align:center;">Session not found</p>';
-    return;
-  }
-
-  // Header
-  document.getElementById('detailTitle').textContent = session.student_name || 'Unknown Student';
-  document.getElementById('detailSubtitle').textContent =
-    'Exam: ' + (session.exam_code || '—') + ' · ' +
-    (session.started_at ? new Date(session.started_at).toLocaleString() : '');
+function loadSessionData() {
+  const student = localStorage.getItem('argus_student') || 'Unknown';
+  const examCode = localStorage.getItem('argus_examCode') || '—';
+  const durationSec = parseInt(localStorage.getItem('argus_duration') || '0');
+  const flags = JSON.parse(localStorage.getItem('argus_flags') || '[]');
+  const snapshots = JSON.parse(localStorage.getItem('argus_snapshots') || '[]');
+  const refSnapshot = localStorage.getItem('argus_reference_snapshot');
 
   // Stats
-  const verdict = (session.verdict || 'PENDING').toUpperCase();
-  let verdictClass = 'verdict-pending';
-  if (verdict === 'CLEAN') verdictClass = 'verdict-clean';
-  else if (verdict === 'SUSPICIOUS') verdictClass = 'verdict-suspicious';
-  else if (verdict === 'HIGH RISK') verdictClass = 'verdict-highrisk';
+  document.getElementById('statStudent').textContent = student;
+  document.getElementById('statExamCode').textContent = examCode;
+  document.getElementById('statTotalFlags').textContent = flags.length;
 
-  document.getElementById('detailStats').innerHTML = `
-    <div class="detail-stat">
-      <div class="stat-label">Duration</div>
-      <div class="stat-value" style="font-size:22px;">${session.duration_seconds ? formatDuration(session.duration_seconds) : '—'}</div>
-    </div>
-    <div class="detail-stat">
-      <div class="stat-label">Suspicion Score</div>
-      <div class="stat-value" style="font-size:22px;">${session.suspicion_score != null ? session.suspicion_score + '/100' : '—'}</div>
-    </div>
-    <div class="detail-stat">
-      <div class="stat-label">Verdict</div>
-      <div><span class="verdict-badge ${verdictClass}" style="font-size:14px;padding:6px 18px;">${verdict}</span></div>
-    </div>
-    <div class="detail-stat">
-      <div class="stat-label">Total Flags</div>
-      <div class="stat-value" style="font-size:22px;color:var(--accent);">${session._flagCount || session.total_flags || 0}</div>
-    </div>
-  `;
+  // Calculate suspicion score
+  const scoreMap = {
+    'tab_switch': 15, 'fullscreen_exit': 15, 'copy_attempt': 20,
+    'right_click': 10, 'multiple_faces': 25, 'no_face': 10, 'gaze_away': 8,
+    'recalibration_requested': 5, 'recalibration_complete': 0,
+    'face_mismatch': 35
+  };
+  let score = 0;
+  flags.forEach(f => { score += scoreMap[f.type] || 10; });
+  score = Math.min(score, 100);
+
+  const scoreEl = document.getElementById('statScore');
+  const badgeEl = document.getElementById('statRiskBadge');
+  scoreEl.textContent = score + '/100';
+
+  if (score <= 20) {
+    scoreEl.className = 'stat-value risk-green'; badgeEl.className = 'risk-badge green'; badgeEl.textContent = 'CLEAN';
+  } else if (score <= 50) {
+    scoreEl.className = 'stat-value risk-yellow'; badgeEl.className = 'risk-badge yellow'; badgeEl.textContent = 'SUSPICIOUS';
+  } else {
+    scoreEl.className = 'stat-value risk-red'; badgeEl.className = 'risk-badge red'; badgeEl.textContent = 'HIGH RISK';
+  }
 
   // Reference face
-  const refSection = document.getElementById('detailRefFace');
-  if (session.reference_snapshot) {
+  const refSection = document.getElementById('adminRefFace');
+  if (refSnapshot) {
     refSection.style.display = 'block';
-    document.getElementById('detailRefImg').src = session.reference_snapshot;
+    document.getElementById('adminRefImg').src = refSnapshot;
   } else {
     refSection.style.display = 'none';
   }
 
-  // Load flags for this session
-  try {
-    const { data: flags, error } = await supabase
-      .from('flags')
-      .select('*')
-      .eq('session_id', sessionId)
-      .order('timestamp', { ascending: true });
-
-    const flagsBody = document.getElementById('detailFlagsBody');
-    if (error || !flags || flags.length === 0) {
-      flagsBody.innerHTML = '<tr><td colspan="5" class="table-empty">No flags recorded — student appears clean</td></tr>';
-    } else {
-      flagsBody.innerHTML = flags.map((f, i) => {
-        const isMismatch = f.flag_type === 'face_mismatch';
-        const severe = isMismatch || ['multiple_faces', 'copy_attempt'].includes(f.flag_type);
-        const rowStyle = isMismatch ? 'background:rgba(255,23,68,0.08);' : '';
-        return `<tr style="${rowStyle}">
-          <td>${i + 1}</td>
-          <td>${f.timestamp ? new Date(f.timestamp).toLocaleTimeString() : '—'}</td>
-          <td>${f.elapsed_seconds != null ? formatDuration(f.elapsed_seconds) : '—'}</td>
-          <td><span class="flag-type-badge ${severe ? 'severe' : ''}" ${isMismatch ? 'style="background:#ff1744;color:#fff;"' : ''}>${(f.flag_type || '').replace(/_/g, ' ')}${isMismatch ? ' 🚨' : ''}</span></td>
-          <td>${escapeHtml(f.detail || '')}</td>
-        </tr>`;
-      }).join('');
-    }
-  } catch (e) {
-    document.getElementById('detailFlagsBody').innerHTML =
-      '<tr><td colspan="5" class="table-empty">Error loading flags</td></tr>';
-  }
-
-  // Load snapshots for this session
-  try {
-    const { data: snaps, error } = await supabase
-      .from('snapshots')
-      .select('*')
-      .eq('session_id', sessionId)
-      .order('captured_at', { ascending: true });
-
-    const gallery = document.getElementById('detailSnapshots');
-    if (error || !snaps || snaps.length === 0) {
-      gallery.innerHTML = '<div class="snapshot-empty">No snapshots captured during this session</div>';
-    } else {
-      gallery.innerHTML = snaps.map((s, i) => {
-        const isFlag = (s.reason || '').startsWith('flag_');
-        return `<div class="snapshot-card ${isFlag ? 'snapshot-flagged' : ''}" onclick="openLightbox('${escapeHtml(s.image_data || '')}', '${escapeHtml(s.captured_at || '')}', '${escapeHtml(s.reason || '')}', ${s.elapsed_seconds || 0})">
-          <img src="${s.image_data}" alt="Snapshot ${i + 1}" loading="lazy">
-          <div class="snapshot-info">
-            <span class="snapshot-time">${s.captured_at ? new Date(s.captured_at).toLocaleTimeString() : '—'}</span>
-            <span class="snapshot-reason ${isFlag ? 'reason-flag' : ''}">${formatReason(s.reason || '')}</span>
-          </div>
-        </div>`;
-      }).join('');
-    }
-  } catch (e) {
-    document.getElementById('detailSnapshots').innerHTML =
-      '<div class="snapshot-empty">Error loading snapshots</div>';
-  }
-
-  // AI Report
-  const aiSection = document.getElementById('detailAiSection');
-  if (session.ai_report) {
-    aiSection.style.display = 'block';
-    document.getElementById('detailAiReport').textContent = session.ai_report;
+  // Flags table
+  const tbody = document.getElementById('flagsBody');
+  if (flags.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="5" class="table-empty">No flags recorded — student appears clean</td></tr>';
   } else {
-    aiSection.style.display = 'none';
+    tbody.innerHTML = flags.map((f, i) => {
+      const isMismatch = f.type === 'face_mismatch';
+      const severe = isMismatch || ['multiple_faces', 'copy_attempt'].includes(f.type);
+      const rowStyle = isMismatch ? 'background:rgba(255,23,68,0.08);' : '';
+      return `<tr style="${rowStyle}">
+        <td>${i + 1}</td>
+        <td>${f.timestamp ? new Date(f.timestamp).toLocaleTimeString() : '—'}</td>
+        <td>${f.elapsedSeconds != null ? formatDuration(f.elapsedSeconds) : '—'}</td>
+        <td><span class="flag-type-badge ${severe ? 'severe' : ''}" ${isMismatch ? 'style="background:#ff1744;color:#fff;"' : ''}>${(f.type || '').replace(/_/g, ' ')}${isMismatch ? ' 🚨' : ''}</span></td>
+        <td>${escapeHtml(f.detail || '')}</td>
+      </tr>`;
+    }).join('');
   }
-}
 
-// Close detail
-document.getElementById('detailCloseBtn').addEventListener('click', () => {
-  document.getElementById('sessionDetailOverlay').style.display = 'none';
-});
-
-document.getElementById('sessionDetailOverlay').addEventListener('click', (e) => {
-  if (e.target === document.getElementById('sessionDetailOverlay')) {
-    document.getElementById('sessionDetailOverlay').style.display = 'none';
-  }
-});
-
-// ══════════════════════════════════════════
-// REAL-TIME MONITORING (STEP 8)
-// ══════════════════════════════════════════
-function startRealtimeMonitoring() {
-  const feedContainer = document.getElementById('realtimeFeed');
-  const entriesEl = document.getElementById('realtimeEntries');
-
-  realtimeChannel = supabase
-    .channel('admin-flags-realtime')
-    .on('postgres_changes', {
-      event: 'INSERT',
-      schema: 'public',
-      table: 'flags'
-    }, (payload) => {
-      console.log('[ARGUS Admin] New flag:', payload);
-      feedContainer.style.display = 'block';
-
-      const flag = payload.new;
-      const entry = document.createElement('div');
-      entry.className = 'realtime-entry realtime-entry-new';
-
-      // Find session name
-      const session = allSessions.find(s => s.id === flag.session_id);
-      const studentName = session ? session.student_name : 'Unknown';
-
-      const isSevere = ['face_mismatch', 'multiple_faces', 'copy_attempt'].includes(flag.flag_type);
-
-      entry.innerHTML = `
-        <div class="realtime-dot ${isSevere ? 'dot-severe' : ''}"></div>
-        <div class="realtime-info">
-          <span class="realtime-student">${escapeHtml(studentName)}</span>
-          <span class="realtime-type ${isSevere ? 'severe' : ''}">${(flag.flag_type || '').replace(/_/g, ' ')}</span>
-          <span class="realtime-detail">${escapeHtml(flag.detail || '')}</span>
+  // Snapshots gallery
+  const gallery = document.getElementById('snapshotsGallery');
+  if (snapshots.length === 0) {
+    gallery.innerHTML = '<div class="snapshot-empty">No snapshots captured during this session</div>';
+  } else {
+    gallery.innerHTML = snapshots.map((s, i) => {
+      const isFlag = (s.reason || '').startsWith('flag_');
+      return `<div class="snapshot-card ${isFlag ? 'snapshot-flagged' : ''}" onclick="openLightbox(${i})">
+        <img src="${s.image}" alt="Snapshot ${i + 1}" loading="lazy">
+        <div class="snapshot-info">
+          <span class="snapshot-time">${s.timestamp ? new Date(s.timestamp).toLocaleTimeString() : '—'}</span>
+          <span class="snapshot-reason ${isFlag ? 'reason-flag' : ''}">${formatReason(s.reason || '')}</span>
         </div>
-        <span class="realtime-time">${new Date().toLocaleTimeString()}</span>
-      `;
-
-      entriesEl.insertBefore(entry, entriesEl.firstChild);
-
-      // Keep only last 50 entries
-      while (entriesEl.children.length > 50) {
-        entriesEl.removeChild(entriesEl.lastChild);
-      }
-
-      // Update flag count in table
-      if (session) {
-        session._flagCount = (session._flagCount || 0) + 1;
-        const row = document.querySelector(`tr[data-session-id="${session.id}"]`);
-        if (row) {
-          const flagBadge = row.querySelector('.flag-count-badge');
-          if (flagBadge) flagBadge.textContent = session._flagCount;
-        }
-      }
-    })
-    .on('postgres_changes', {
-      event: '*',
-      schema: 'public',
-      table: 'exam_sessions'
-    }, (payload) => {
-      console.log('[ARGUS Admin] Session update:', payload);
-      // Reload sessions on any session change
-      loadAllSessions();
-    })
-    .subscribe((status) => {
-      console.log('[ARGUS Admin] Realtime status:', status);
-    });
+      </div>`;
+    }).join('');
+  }
 }
 
 // ══════════════════════════════════════════
@@ -639,12 +260,15 @@ function escapeHtml(str) {
 }
 
 // Lightbox
-function openLightbox(imgSrc, timestamp, reason, elapsed) {
-  document.getElementById('lightboxImg').src = imgSrc;
+function openLightbox(index) {
+  const snapshots = JSON.parse(localStorage.getItem('argus_snapshots') || '[]');
+  const s = snapshots[index];
+  if (!s) return;
+  document.getElementById('lightboxImg').src = s.image;
   document.getElementById('lightboxMeta').innerHTML =
-    '<strong>' + (timestamp ? new Date(timestamp).toLocaleString() : '') + '</strong>' +
-    ' · Elapsed: ' + formatDuration(elapsed) +
-    ' · Reason: ' + formatReason(reason);
+    '<strong>' + (s.timestamp ? new Date(s.timestamp).toLocaleString() : '') + '</strong>' +
+    ' · Elapsed: ' + formatDuration(s.elapsed) +
+    ' · Reason: ' + formatReason(s.reason || '');
   document.getElementById('snapshotLightbox').style.display = 'flex';
 }
 
@@ -655,7 +279,6 @@ function closeLightbox() {
 // Keyboard shortcut: Escape to close modals
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
-    document.getElementById('sessionDetailOverlay').style.display = 'none';
     document.getElementById('snapshotLightbox').style.display = 'none';
   }
 });
