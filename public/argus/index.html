@@ -956,8 +956,10 @@ async function startExam() {
   // Proctoring and timers must start ONLY here
   attachProctoring();
   startTimer();
-  initFaceDetection();
   startSnapshots();
+
+  // Face detection models MUST load before capturing reference face
+  await initFaceDetection();
   captureReferenceFace();
 }
 
@@ -1374,33 +1376,47 @@ async function checkHeadPose() {
 }
 
 // ── Face Mismatch Detection ──
+let referenceFaceCaptureAttempts = 0;
+
 async function captureReferenceFace() {
+  referenceFaceCaptureAttempts++;
+  console.log('[ARGUS] captureReferenceFace attempt #' + referenceFaceCaptureAttempts);
+
   try {
-    console.log('[ARGUS] Waiting 3s before capturing reference face...');
-    await new Promise(r => setTimeout(r, 3000));
+    console.log('[ARGUS] Waiting 2s before capturing reference face...');
+    await new Promise(r => setTimeout(r, 2000));
 
     // Wait for face recognition model to load
+    if (typeof faceapi === 'undefined') {
+      console.warn('[ARGUS] face-api.js not available, retrying in 3s...');
+      if (referenceFaceCaptureAttempts < 20) setTimeout(captureReferenceFace, 3000);
+      return;
+    }
+
     if (!faceapi.nets.faceRecognitionNet.isLoaded) {
       console.log('[ARGUS] Face recognition model not loaded yet, retrying in 3s...');
-      setTimeout(captureReferenceFace, 3000);
+      if (referenceFaceCaptureAttempts < 20) setTimeout(captureReferenceFace, 3000);
       return;
     }
 
     const video = document.querySelector('#webcamVideo, video');
     if (!video || video.videoWidth === 0) {
       console.log('[ARGUS] Video not ready, retrying in 2s...');
-      setTimeout(captureReferenceFace, 2000);
+      if (referenceFaceCaptureAttempts < 20) setTimeout(captureReferenceFace, 2000);
       return;
     }
 
+    console.log('[ARGUS] Running face detection on video...');
     const detection = await faceapi
-      .detectSingleFace(video, new faceapi.TinyFaceDetectorOptions())
+      .detectSingleFace(video, new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.3 }))
       .withFaceLandmarks(true)
       .withFaceDescriptor();
 
+    console.log('[ARGUS] Detection result:', detection ? 'FACE FOUND' : 'NO FACE');
+
     if (detection) {
       referenceFaceDescriptor = detection.descriptor;
-      console.log('[ARGUS] ✅ Reference face captured successfully');
+      console.log('[ARGUS] ✅ Reference face descriptor captured, length:', referenceFaceDescriptor.length);
 
       // Store reference snapshot
       try {
@@ -1411,9 +1427,7 @@ async function captureReferenceFace() {
         ctx.drawImage(video, 0, 0, 320, 240);
         const refSnapshot = canvas.toDataURL('image/jpeg', 0.7);
         localStorage.setItem('argus_reference_snapshot', refSnapshot);
-        console.log('[ARGUS] Reference face snapshot stored');
-
-
+        console.log('[ARGUS] Reference face snapshot stored in localStorage');
       } catch (snapErr) {
         console.warn('[ARGUS] Could not store reference snapshot:', snapErr);
       }
@@ -1421,35 +1435,55 @@ async function captureReferenceFace() {
       // Show confirmation toast
       showWarningPopup('Identity verified ✅ — Reference face captured');
 
-      // Start periodic face match checks every 30s
+      // Start periodic face match checks every 15 seconds
+      console.log('[ARGUS] Starting face mismatch checks every 15s');
       faceMismatchInterval = setInterval(() => {
         if (!examActive) return;
         checkFaceMatch();
-      }, 30000);
+      }, 15000);
+
+      // Also run first check after 10 seconds
+      setTimeout(() => {
+        if (examActive) checkFaceMatch();
+      }, 10000);
     } else {
       console.log('[ARGUS] Could not detect face for reference, retrying in 2s...');
-      setTimeout(captureReferenceFace, 2000);
+      if (referenceFaceCaptureAttempts < 20) setTimeout(captureReferenceFace, 2000);
     }
   } catch (e) {
-    console.warn('[ARGUS] Face capture error:', e);
-    setTimeout(captureReferenceFace, 3000);
+    console.warn('[ARGUS] Face capture error:', e.message || e);
+    if (referenceFaceCaptureAttempts < 20) setTimeout(captureReferenceFace, 3000);
   }
 }
 
 async function checkFaceMatch() {
+  console.log('[ARGUS] checkFaceMatch() called');
   try {
-    if (!referenceFaceDescriptor) return;
-    if (!faceapi.nets.faceRecognitionNet.isLoaded) return;
+    if (!referenceFaceDescriptor) {
+      console.log('[ARGUS] No reference face descriptor, skipping check');
+      return;
+    }
+    if (typeof faceapi === 'undefined' || !faceapi.nets.faceRecognitionNet.isLoaded) {
+      console.log('[ARGUS] Face recognition model not loaded, skipping check');
+      return;
+    }
 
     const video = document.querySelector('#webcamVideo, video');
-    if (!video || video.videoWidth === 0) return;
+    if (!video || video.videoWidth === 0) {
+      console.log('[ARGUS] Video not available for face check');
+      return;
+    }
 
+    console.log('[ARGUS] Running face comparison...');
     const detection = await faceapi
-      .detectSingleFace(video, new faceapi.TinyFaceDetectorOptions())
+      .detectSingleFace(video, new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.3 }))
       .withFaceLandmarks(true)
       .withFaceDescriptor();
 
-    if (!detection) return;
+    if (!detection) {
+      console.log('[ARGUS] No face detected for comparison');
+      return;
+    }
 
     // Compare with reference face using euclidean distance
     const distance = faceapi.euclideanDistance(
@@ -1457,19 +1491,19 @@ async function checkFaceMatch() {
       detection.descriptor
     );
 
-    console.log('[ARGUS] Face match distance:', distance.toFixed(3));
+    console.log('[ARGUS] 🔍 Face match distance:', distance.toFixed(3), '(threshold: >0.6 = mismatch)');
 
     // distance < 0.4 = same person (confident match)
     // distance 0.4-0.6 = uncertain
     // distance > 0.6 = different person
     if (distance > 0.6) {
-      console.log('[ARGUS] ⚠️ FACE MISMATCH DETECTED:', distance.toFixed(3));
+      console.log('[ARGUS] 🚨🚨🚨 FACE MISMATCH DETECTED! Distance:', distance.toFixed(3));
 
       if (!faceMismatchCooldown) {
         faceMismatchCooldown = true;
 
-        // Show strong warning popup immediately
-        showWarningPopup('⚠️ ARGUS detected possible identity mismatch — different face detected');
+        // Show PERSISTENT strong warning (not auto-dismiss)
+        showFaceMismatchWarning(distance);
 
         // Add flag with confidence score
         const confidence = Math.min(Math.round((distance - 0.4) * 100), 100);
@@ -1478,20 +1512,61 @@ async function checkFaceMatch() {
           'Different face detected — possible impersonation (confidence: ' + confidence + '%, distance: ' + distance.toFixed(3) + ')'
         );
 
-        // Longer cooldown for mismatch — 30 seconds (avoid spam)
+        // Capture a snapshot of the mismatch
+        captureSnapshot('flag_face_mismatch');
+
+        // Cooldown — 30 seconds to avoid spam
         setTimeout(() => {
           faceMismatchCooldown = false;
         }, 30000);
       }
     } else if (distance > 0.4 && distance <= 0.6) {
       console.log('[ARGUS] Face uncertain:', distance.toFixed(3));
-      // Don't flag uncertain — just log it
     } else {
       console.log('[ARGUS] Face matched ✅:', distance.toFixed(3));
     }
   } catch (e) {
-    console.warn('[ARGUS] Face match check error:', e);
+    console.warn('[ARGUS] Face match check error:', e.message || e);
   }
+}
+
+// Persistent face mismatch warning that stays on screen
+function showFaceMismatchWarning(distance) {
+  // Remove existing mismatch warning
+  const existing = document.getElementById('argusFaceMismatchWarning');
+  if (existing) existing.remove();
+
+  const popup = document.createElement('div');
+  popup.id = 'argusFaceMismatchWarning';
+  popup.style.cssText = `
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    z-index: 999999;
+    background: linear-gradient(135deg, #ff1744, #d50000);
+    color: #fff;
+    font-family: 'Inter', 'Segoe UI', sans-serif;
+    text-align: center;
+    padding: 20px 24px;
+    box-shadow: 0 4px 30px rgba(255,23,68,0.7);
+    animation: argusSlideDown 0.3s ease-out;
+  `;
+  popup.innerHTML = `
+    <div style="font-size:20px;font-weight:800;margin-bottom:4px;">🚨 IDENTITY MISMATCH DETECTED 🚨</div>
+    <div style="font-size:14px;opacity:0.9;">ARGUS detected a different face — possible impersonation attempt</div>
+    <div style="font-size:12px;opacity:0.7;margin-top:4px;">Distance: ${distance.toFixed(3)} | This event has been logged</div>
+  `;
+
+  document.body.appendChild(popup);
+
+  // Auto-dismiss after 6 seconds (longer than normal warnings)
+  setTimeout(() => {
+    if (popup.parentNode) {
+      popup.style.animation = 'argusSlideUp 0.3s ease-in forwards';
+      setTimeout(() => { if (popup.parentNode) popup.remove(); }, 300);
+    }
+  }, 6000);
+
+  console.log('[ARGUS] 🚨 Face mismatch warning shown to student');
 }
 
 // ── End Exam ──
