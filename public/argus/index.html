@@ -89,6 +89,9 @@
     <div class="eye-tracking-indicator active" id="eyeTrackingIndicator" title="Eye tracking active">
       <span class="eye-tracking-icon">👁</span>
     </div>
+    <div class="eye-tracking-indicator active" id="audioIndicator" title="Audio monitoring active" style="right:60px;left:auto;background:rgba(16,185,129,0.15);border-color:rgba(16,185,129,0.3);">
+      <span class="eye-tracking-icon">🎙</span>
+    </div>
     <!-- Top Bar -->
     <div class="exam-topbar">
       <div class="topbar-left">
@@ -266,6 +269,18 @@ let nullDataCount = 0;
 let referenceFaceDescriptor = null;
 let faceMismatchCooldown = false;
 let faceMismatchInterval = null;
+
+// ── Audio Detection ──
+let audioContext = null;
+let audioAnalyser = null;
+let audioDataArray = null;
+let audioStream = null;
+let audioMonitorInterval = null;
+let audioSpikeTimer = null;
+let audioCooldown = false;
+let audioThreshold = 25; // default, will be calibrated
+let audioFlagCount = 0;
+let ambientNoiseLevel = 0;
 
 // ── Instant Warning Popup (non-blocking red overlay) ──
 function showWarningPopup(message) {
@@ -961,6 +976,11 @@ async function startExam() {
   // Face detection models MUST load before capturing reference face
   await initFaceDetection();
   captureReferenceFace();
+
+  // Start audio monitoring
+  if (audioStream) {
+    setupAudioMonitoring();
+  }
 }
 
 // ── Fullscreen ──
@@ -979,6 +999,15 @@ async function ensureCameraPermission() {
   try {
     const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
     webcamStream = stream;
+
+    // Also request microphone for audio monitoring
+    try {
+      audioStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+      console.log('[ARGUS] 🎙 Microphone permission granted');
+    } catch (micErr) {
+      console.warn('[ARGUS] Microphone access denied (audio monitoring disabled):', micErr.message);
+    }
+
     return webcamStream;
   } catch (e) {
     console.warn('Webcam access denied:', e);
@@ -1569,6 +1598,156 @@ function showFaceMismatchWarning(distance) {
   console.log('[ARGUS] 🚨 Face mismatch warning shown to student');
 }
 
+// ══════════════════════════════════════════
+// AUDIO DETECTION (Web Audio API)
+// ══════════════════════════════════════════
+function setupAudioMonitoring() {
+  if (!audioStream) {
+    console.warn('[ARGUS] No audio stream available, skipping audio monitoring');
+    const indicator = document.getElementById('audioIndicator');
+    if (indicator) indicator.style.display = 'none';
+    return;
+  }
+
+  try {
+    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    audioAnalyser = audioContext.createAnalyser();
+    const microphone = audioContext.createMediaStreamSource(audioStream);
+
+    audioAnalyser.fftSize = 256;
+    microphone.connect(audioAnalyser);
+
+    audioDataArray = new Uint8Array(audioAnalyser.frequencyBinCount);
+
+    console.log('[ARGUS] 🎙 Audio analyser initialized, starting ambient calibration...');
+    updateAudioIndicator(false);
+
+    // ── STEP 1: Calibrate ambient noise for 3 seconds ──
+    const calibrationSamples = [];
+    const calibrateInterval = setInterval(() => {
+      audioAnalyser.getByteFrequencyData(audioDataArray);
+      const avg = audioDataArray.reduce((a, b) => a + b, 0) / audioDataArray.length;
+      calibrationSamples.push(avg);
+      console.log('[ARGUS] 🎙 Calibration sample #' + calibrationSamples.length + ': ' + avg.toFixed(2));
+
+      if (calibrationSamples.length >= 6) {
+        clearInterval(calibrateInterval);
+
+        ambientNoiseLevel = calibrationSamples.reduce((a, b) => a + b, 0) / calibrationSamples.length;
+        audioThreshold = ambientNoiseLevel + 15;
+
+        console.log('[ARGUS] 🎙 Ambient noise level: ' + ambientNoiseLevel.toFixed(2));
+        console.log('[ARGUS] 🎙 Audio threshold set to: ' + audioThreshold.toFixed(2));
+
+        // Start actual monitoring after calibration
+        startAudioMonitoring();
+      }
+    }, 500);
+
+  } catch (e) {
+    console.warn('[ARGUS] Failed to setup audio monitoring:', e.message);
+    const indicator = document.getElementById('audioIndicator');
+    if (indicator) indicator.style.display = 'none';
+  }
+}
+
+function startAudioMonitoring() {
+  console.log('[ARGUS] 🎙 Audio monitoring started (threshold: ' + audioThreshold.toFixed(2) + ')');
+
+  audioMonitorInterval = setInterval(() => {
+    if (!examActive || !audioAnalyser) return;
+
+    audioAnalyser.getByteFrequencyData(audioDataArray);
+
+    // Calculate average volume
+    const average = audioDataArray.reduce((a, b) => a + b, 0) / audioDataArray.length;
+
+    // Loud threshold = ambient + 30 (for loud talking)
+    const loudThreshold = ambientNoiseLevel + 30;
+
+    if (average > audioThreshold) {
+      // Suspicious audio detected
+      updateAudioIndicator(true);
+
+      if (!audioSpikeTimer && !audioCooldown) {
+        // Wait 800ms of sustained audio before flagging (~1-2s total latency)
+        audioSpikeTimer = setTimeout(() => {
+          audioCooldown = true;
+          audioFlagCount++;
+
+          const isLoud = average > loudThreshold;
+
+          // Show warning popup
+          showWarningPopup(isLoud
+            ? '🎙 ARGUS detected loud audio activity near student'
+            : '🎙 ARGUS detected suspicious audio — possible whispering');
+
+          // Add flag
+          addFlag(
+            'audio_detected',
+            isLoud
+              ? 'Loud talking detected near student (level: ' + average.toFixed(1) + ', threshold: ' + audioThreshold.toFixed(1) + ')'
+              : 'Suspicious audio/whispering detected (level: ' + average.toFixed(1) + ', threshold: ' + audioThreshold.toFixed(1) + ')'
+          );
+
+          console.log('[ARGUS] 🎙 AUDIO FLAG #' + audioFlagCount + ' — level: ' + average.toFixed(2) + ', threshold: ' + audioThreshold.toFixed(2));
+
+          // Capture snapshot when audio flag triggers
+          captureSnapshot('flag_audio_detected');
+
+          // 8 second cooldown
+          setTimeout(() => {
+            audioCooldown = false;
+          }, 8000);
+
+          audioSpikeTimer = null;
+        }, 800);
+      }
+    } else {
+      // Audio is within normal range
+      updateAudioIndicator(false);
+
+      if (audioSpikeTimer) {
+        clearTimeout(audioSpikeTimer);
+        audioSpikeTimer = null;
+      }
+    }
+  }, 200);
+}
+
+function updateAudioIndicator(spike) {
+  const indicator = document.getElementById('audioIndicator');
+  if (!indicator) return;
+
+  if (spike) {
+    indicator.style.background = 'rgba(239,68,68,0.2)';
+    indicator.style.borderColor = 'rgba(239,68,68,0.5)';
+    indicator.title = 'Audio spike detected!';
+  } else {
+    indicator.style.background = 'rgba(16,185,129,0.15)';
+    indicator.style.borderColor = 'rgba(16,185,129,0.3)';
+    indicator.title = 'Audio monitoring active';
+  }
+}
+
+function stopAudioMonitoring() {
+  if (audioMonitorInterval) {
+    clearInterval(audioMonitorInterval);
+    audioMonitorInterval = null;
+  }
+  if (audioSpikeTimer) {
+    clearTimeout(audioSpikeTimer);
+    audioSpikeTimer = null;
+  }
+  if (audioContext && audioContext.state !== 'closed') {
+    try { audioContext.close(); } catch (e) {}
+  }
+  if (audioStream) {
+    audioStream.getTracks().forEach(t => t.stop());
+  }
+  console.log('[ARGUS] 🎙 Audio monitoring stopped');
+}
+
 // ── End Exam ──
 function endExam() {
   examActive = false;
@@ -1582,12 +1761,14 @@ function endExam() {
   if (verticalTurnTimer) { clearTimeout(verticalTurnTimer); verticalTurnTimer = null; }
   if (faceMismatchInterval) { clearInterval(faceMismatchInterval); faceMismatchInterval = null; }
   stopEyeTracking();
+  stopAudioMonitoring();
 
   captureSnapshot('exam_end');
 
   const durationSecs = Math.round((Date.now() - examStartTime) / 1000);
   localStorage.setItem('argus_duration', durationSecs.toString());
   localStorage.setItem('argus_flags', JSON.stringify(flags));
+  localStorage.setItem('audioFlags', String(audioFlagCount));
   localStorage.setItem('argus_snapshots', JSON.stringify(snapshots));
   localStorage.setItem('eyeTrackingFlags', String(eyeTrackingFlagCount));
 
@@ -1596,7 +1777,7 @@ function endExam() {
     'tab_switch': 15, 'fullscreen_exit': 15, 'copy_attempt': 20,
     'right_click': 10, 'multiple_faces': 25, 'no_face': 10, 'gaze_away': 8,
     'recalibration_requested': 5, 'recalibration_complete': 0,
-    'face_mismatch': 35
+    'face_mismatch': 35, 'audio_detected': 12
   };
   let score = 0;
   flags.forEach(f => { score += scoreMap[f.type] || 10; });

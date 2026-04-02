@@ -186,7 +186,7 @@ function loadDashboard() {
     'tab_switch': 15, 'fullscreen_exit': 15, 'copy_attempt': 20,
     'right_click': 10, 'multiple_faces': 25, 'no_face': 10, 'gaze_away': 8,
     'recalibration_requested': 5, 'recalibration_complete': 0,
-    'face_mismatch': 35
+    'face_mismatch': 35, 'audio_detected': 12
   };
   let score = 0;
   const faceMismatchCount = flags.filter(f => f.type === 'face_mismatch').length;
@@ -388,7 +388,9 @@ Total Flags: ${flags.length}
 Flag Details:
 ${JSON.stringify(flags, null, 2)}${mismatchContext}
 
-IMPORTANT WEIGHTING: Face mismatch events (face_mismatch) should be treated as the STRONGEST indicator of cheating — even a single face mismatch should result in at minimum a SUSPICIOUS verdict. Multiple mismatches should almost certainly result in HIGH RISK.
+Audio Detection: ${flags.filter(f => f.type === 'audio_detected').length} audio flag(s) detected. Audio flags indicate the student's microphone picked up suspicious sounds like talking, whispering, or other voices nearby during the exam.
+
+IMPORTANT WEIGHTING: Face mismatch events (face_mismatch) should be treated as the STRONGEST indicator of cheating — even a single face mismatch should result in at minimum a SUSPICIOUS verdict. Multiple mismatches should almost certainly result in HIGH RISK. Audio detection events (audio_detected) are moderate indicators — multiple audio flags combined with other violations strongly suggest external help or communication.
 
 Give your response in this exact format:
 VERDICT: [CLEAN/SUSPICIOUS/HIGH RISK]
