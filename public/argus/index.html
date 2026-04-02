@@ -250,12 +250,67 @@ let lookAwayTimer = null;
 let isLookingAway = false;
 let eyeTrackingInterval = null;
 let eyeFlagCooldown = false;
+let verticalTurnTimer = null;
+let verticalCooldown = false;
 let calibratedPoints = 0;
 let isRecalibrating = false;
 let timerPausedAt = 0;
 const calibrationClicks = {};
 const LOOK_AWAY_THRESHOLD_MS = 1000;
 let nullDataCount = 0;
+
+// ── Instant Warning Popup (non-blocking red overlay) ──
+function showWarningPopup(message) {
+  // Remove any existing popup first
+  const existing = document.getElementById('argusInstantWarning');
+  if (existing) existing.remove();
+
+  const popup = document.createElement('div');
+  popup.id = 'argusInstantWarning';
+  popup.style.cssText = `
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    z-index: 999999;
+    background: linear-gradient(135deg, #ff1744, #d50000);
+    color: #fff;
+    font-family: 'Inter', 'Segoe UI', sans-serif;
+    font-size: 16px;
+    font-weight: 600;
+    text-align: center;
+    padding: 16px 24px;
+    box-shadow: 0 4px 20px rgba(255,23,68,0.5);
+    pointer-events: none;
+    animation: argusSlideDown 0.3s ease-out;
+  `;
+  popup.textContent = '⚠️ ' + message;
+
+  // Add animation keyframes if not already present
+  if (!document.getElementById('argusPopupStyles')) {
+    const style = document.createElement('style');
+    style.id = 'argusPopupStyles';
+    style.textContent = `
+      @keyframes argusSlideDown {
+        from { transform: translateY(-100%); opacity: 0; }
+        to   { transform: translateY(0);     opacity: 1; }
+      }
+      @keyframes argusSlideUp {
+        from { transform: translateY(0);     opacity: 1; }
+        to   { transform: translateY(-100%); opacity: 0; }
+      }
+    `;
+    document.head.appendChild(style);
+  }
+
+  document.body.appendChild(popup);
+
+  // Auto-dismiss after 2 seconds
+  setTimeout(() => {
+    popup.style.animation = 'argusSlideUp 0.3s ease-in forwards';
+    setTimeout(() => popup.remove(), 300);
+  }, 2000);
+
+  console.log('[ARGUS] ⚠️ Instant warning popup shown:', message);
+}
 
 // ── Elements ──
 const landingScreen = document.getElementById('landingScreen');
@@ -1247,36 +1302,50 @@ async function checkHeadPose() {
 
     // Normal looking forward = ~0.40-0.55
     // Looking down = ratio increases > 0.57
-    // Looking up = ratio decreases < 0.45
+    // Looking up = ratio decreases < 0.35 (was 0.45 — too sensitive)
     if (noseVerticalRatio > 0.57) {
       console.log('[ARGUS] LOOKING DOWN DETECTED:', noseVerticalRatio.toFixed(2));
 
-      if (!headTurnTimer) {
-        headTurnTimer = setTimeout(() => {
-          if (!eyeFlagCooldown) {
-            eyeFlagCooldown = true;
-            addFlag('head_turn', 'Student looked down - possibly cheating from phone');
-            setTimeout(() => {
-              eyeFlagCooldown = false;
-            }, 5000);
-          }
-          headTurnTimer = null;
+      // Show warning popup IMMEDIATELY (but only if not in cooldown)
+      if (!verticalCooldown) {
+        showWarningPopup('ARGUS detected suspicious eye movement — looking down');
+      }
+
+      // Then start timer for flag storage (separate from popup)
+      if (!verticalTurnTimer && !verticalCooldown) {
+        verticalTurnTimer = setTimeout(() => {
+          verticalCooldown = true;
+          addFlag('head_turn', 'Student looked down - possibly cheating from phone');
+          setTimeout(() => {
+            verticalCooldown = false;
+          }, 2000);
+          verticalTurnTimer = null;
         }, 400);
       }
-    } else if (noseVerticalRatio < 0.45) {
+    } else if (noseVerticalRatio < 0.35) {
       console.log('[ARGUS] LOOKING UP DETECTED:', noseVerticalRatio.toFixed(2));
 
-      if (!headTurnTimer) {
-        headTurnTimer = setTimeout(() => {
-          if (!eyeFlagCooldown) {
-            eyeFlagCooldown = true;
-            addFlag('head_turn', 'Student looked up from screen');
-            setTimeout(() => {
-              eyeFlagCooldown = false;
-            }, 5000);
-          }
-          headTurnTimer = null;
+      // Show warning popup IMMEDIATELY (but only if not in cooldown)
+      if (!verticalCooldown) {
+        showWarningPopup('ARGUS detected suspicious eye movement — looking up');
+      }
+
+      // Then start timer for flag storage (separate from popup)
+      if (!verticalTurnTimer && !verticalCooldown) {
+        verticalTurnTimer = setTimeout(() => {
+          verticalCooldown = true;
+          addFlag('head_turn', 'Student looked up from screen');
+          setTimeout(() => {
+            verticalCooldown = false;
+          }, 2000);
+          verticalTurnTimer = null;
         }, 300);
+      }
+    } else {
+      // Gaze returned to normal — cancel pending vertical timer
+      if (verticalTurnTimer) {
+        clearTimeout(verticalTurnTimer);
+        verticalTurnTimer = null;
       }
     }
   } catch (e) {
@@ -1294,6 +1363,7 @@ function endExam() {
   if (faceDetectionInterval) clearInterval(faceDetectionInterval);
   if (headTurnInterval) clearInterval(headTurnInterval);
   if (headTurnTimer) { clearTimeout(headTurnTimer); headTurnTimer = null; }
+  if (verticalTurnTimer) { clearTimeout(verticalTurnTimer); verticalTurnTimer = null; }
   stopEyeTracking();
 
   captureSnapshot('exam_end');
