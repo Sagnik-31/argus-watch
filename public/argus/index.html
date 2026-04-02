@@ -29,6 +29,38 @@
     </div>
   </div>
 
+  <!-- ── Face Alignment Screen ── -->
+  <div class="face-align-screen" id="faceAlignScreen" style="display:none;">
+    <div class="face-align-container">
+      <div class="face-align-header">
+        <span class="logo-icon">👁</span>
+        <div class="logo-text">ARGUS</div>
+        <div class="tagline">Face Alignment Check</div>
+        <div class="face-align-subtitle">Position your face inside the oval guide for best tracking accuracy</div>
+      </div>
+
+      <div class="face-align-preview">
+        <video id="alignVideo" autoplay muted playsinline></video>
+        <div class="face-oval-guide" id="faceOvalGuide"></div>
+        <canvas id="alignCanvas" style="display:none;"></canvas>
+      </div>
+
+      <div class="face-align-status" id="faceAlignStatus">
+        <div class="face-status-icon" id="faceStatusIcon">⏳</div>
+        <div class="face-status-text" id="faceStatusText">Loading face detection models...</div>
+      </div>
+
+      <div class="face-align-hints" id="faceAlignHints" style="display:none;">
+        <div class="face-hint" id="hintHorizontal"><span class="hint-icon">↔</span> <span class="hint-text">Centered horizontally</span></div>
+        <div class="face-hint" id="hintVertical"><span class="hint-icon">↕</span> <span class="hint-text">Centered vertically</span></div>
+        <div class="face-hint" id="hintSize"><span class="hint-icon">📏</span> <span class="hint-text">Face size OK</span></div>
+      </div>
+
+      <button class="btn-primary" id="faceAlignContinueBtn" disabled>Continue to Calibration</button>
+    </div>
+  </div>
+
+
   <!-- ── Eye Tracking Calibration Screen ── -->
   <div class="calibration-screen" id="calibrationScreen" style="display:none;">
     <div class="calibration-header">
@@ -617,13 +649,195 @@ startExamBtn.addEventListener('click', async () => {
 
   try {
     await ensureCameraPermission();
-    startCalibrationFlow();
+    startFaceAlignmentFlow();
   } catch (e) {
     alert('Camera permission is required to start the exam.');
   } finally {
     startExamBtn.disabled = false;
     startExamBtn.textContent = originalBtnText;
   }
+});
+
+// ══════════════════════════════════════════
+// FACE ALIGNMENT FLOW
+// ══════════════════════════════════════════
+let faceAlignInterval = null;
+let faceAlignModelsLoaded = false;
+let consecutiveCenteredFrames = 0;
+const REQUIRED_CENTERED_FRAMES = 10; // ~2 seconds of being centered
+
+async function startFaceAlignmentFlow() {
+  landingScreen.style.display = 'none';
+  const faceAlignScreen = document.getElementById('faceAlignScreen');
+  faceAlignScreen.style.display = 'flex';
+
+  const alignVideo = document.getElementById('alignVideo');
+  alignVideo.srcObject = webcamStream;
+
+  const statusIcon = document.getElementById('faceStatusIcon');
+  const statusText = document.getElementById('faceStatusText');
+  const hints = document.getElementById('faceAlignHints');
+  const continueBtn = document.getElementById('faceAlignContinueBtn');
+  const ovalGuide = document.getElementById('faceOvalGuide');
+
+  continueBtn.disabled = true;
+  consecutiveCenteredFrames = 0;
+  ovalGuide.className = 'face-oval-guide';
+
+  // Load face-api models if not already loaded
+  if (!faceAlignModelsLoaded) {
+    statusIcon.textContent = '⏳';
+    statusText.textContent = 'Loading face detection models...';
+    try {
+      if (typeof faceapi !== 'undefined') {
+        const MODEL_URL = 'https://justadudewhohacks.github.io/face-api.js/models';
+        await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
+        faceAlignModelsLoaded = true;
+        console.log('[ARGUS] Face alignment models loaded');
+      } else {
+        // face-api not loaded yet — wait for it
+        await new Promise((resolve, reject) => {
+          let attempts = 0;
+          const waitInterval = setInterval(() => {
+            attempts++;
+            if (typeof faceapi !== 'undefined') {
+              clearInterval(waitInterval);
+              resolve();
+            } else if (attempts > 20) {
+              clearInterval(waitInterval);
+              reject(new Error('face-api.js failed to load'));
+            }
+          }, 500);
+        });
+        const MODEL_URL = 'https://justadudewhohacks.github.io/face-api.js/models';
+        await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
+        faceAlignModelsLoaded = true;
+      }
+    } catch (e) {
+      console.warn('[ARGUS] Face alignment model load failed:', e);
+      statusIcon.textContent = '⚠️';
+      statusText.textContent = 'Could not load face detection. You may continue anyway.';
+      continueBtn.disabled = false;
+      return;
+    }
+  }
+
+  statusIcon.textContent = '🔍';
+  statusText.textContent = 'Detecting your face...';
+  hints.style.display = 'flex';
+
+  // Start continuous face alignment checking
+  faceAlignInterval = setInterval(() => checkFaceAlignment(), 200);
+}
+
+async function checkFaceAlignment() {
+  const alignVideo = document.getElementById('alignVideo');
+  const statusIcon = document.getElementById('faceStatusIcon');
+  const statusText = document.getElementById('faceStatusText');
+  const continueBtn = document.getElementById('faceAlignContinueBtn');
+  const ovalGuide = document.getElementById('faceOvalGuide');
+  const hintH = document.getElementById('hintHorizontal');
+  const hintV = document.getElementById('hintVertical');
+  const hintS = document.getElementById('hintSize');
+
+  if (!alignVideo || alignVideo.videoWidth === 0) return;
+
+  try {
+    const detection = await faceapi.detectSingleFace(alignVideo, new faceapi.TinyFaceDetectorOptions());
+
+    if (!detection) {
+      statusIcon.textContent = '❌';
+      statusText.textContent = 'No face detected — make sure your face is visible';
+      ovalGuide.className = 'face-oval-guide error';
+      consecutiveCenteredFrames = 0;
+      continueBtn.disabled = true;
+      setHint(hintH, false, 'Face not found');
+      setHint(hintV, false, 'Face not found');
+      setHint(hintS, false, 'Face not found');
+      return;
+    }
+
+    const box = detection.box;
+    const videoW = alignVideo.videoWidth;
+    const videoH = alignVideo.videoHeight;
+
+    // Face center relative to video (0-1 range)
+    const faceCenterX = (box.x + box.width / 2) / videoW;
+    const faceCenterY = (box.y + box.height / 2) / videoH;
+    const faceWidthRatio = box.width / videoW;
+    const faceHeightRatio = box.height / videoH;
+
+    // Check centering (ideal: 0.5, tolerance: ±0.15)
+    const hCentered = Math.abs(faceCenterX - 0.5) < 0.15;
+    const vCentered = Math.abs(faceCenterY - 0.5) < 0.18;
+
+    // Check size (face should be ~20-55% of video width)
+    const sizeOk = faceWidthRatio > 0.18 && faceWidthRatio < 0.55;
+
+    // Determine direction hints
+    let hHint = 'Centered horizontally ✓';
+    if (!hCentered) {
+      hHint = faceCenterX < 0.5 ? 'Move right →' : '← Move left';
+    }
+
+    let vHint = 'Centered vertically ✓';
+    if (!vCentered) {
+      vHint = faceCenterY < 0.5 ? 'Move down ↓' : '↑ Move up';
+    }
+
+    let sHint = 'Face size OK ✓';
+    if (!sizeOk) {
+      sHint = faceWidthRatio < 0.18 ? 'Move closer to camera' : 'Move further from camera';
+    }
+
+    setHint(hintH, hCentered, hHint);
+    setHint(hintV, vCentered, vHint);
+    setHint(hintS, sizeOk, sHint);
+
+    const allGood = hCentered && vCentered && sizeOk;
+
+    if (allGood) {
+      consecutiveCenteredFrames++;
+      ovalGuide.className = 'face-oval-guide success';
+
+      if (consecutiveCenteredFrames >= REQUIRED_CENTERED_FRAMES) {
+        statusIcon.textContent = '✅';
+        statusText.textContent = 'Face aligned perfectly! You can continue.';
+        continueBtn.disabled = false;
+      } else {
+        statusIcon.textContent = '🟢';
+        statusText.textContent = 'Hold still... verifying alignment (' + Math.round((consecutiveCenteredFrames / REQUIRED_CENTERED_FRAMES) * 100) + '%)';
+        continueBtn.disabled = true;
+      }
+    } else {
+      consecutiveCenteredFrames = 0;
+      ovalGuide.className = 'face-oval-guide warning';
+      statusIcon.textContent = '⚠️';
+      statusText.textContent = 'Adjust your position — follow the hints below';
+      continueBtn.disabled = true;
+    }
+  } catch (e) {
+    console.warn('[ARGUS] Face alignment check error:', e);
+  }
+}
+
+function setHint(el, ok, text) {
+  el.className = 'face-hint ' + (ok ? 'hint-ok' : 'hint-warn');
+  el.querySelector('.hint-text').textContent = text;
+}
+
+function stopFaceAlignment() {
+  if (faceAlignInterval) {
+    clearInterval(faceAlignInterval);
+    faceAlignInterval = null;
+  }
+}
+
+// Continue button → go to calibration
+document.getElementById('faceAlignContinueBtn').addEventListener('click', () => {
+  stopFaceAlignment();
+  document.getElementById('faceAlignScreen').style.display = 'none';
+  startCalibrationFlow();
 });
 
 function startExam() {
@@ -658,6 +872,7 @@ function startExam() {
   // Only transition to the exam screen after permission + credentials
   landingScreen.style.display = 'none';
   calibrationScreen.style.display = 'none';
+  document.getElementById('faceAlignScreen').style.display = 'none';
   examScreen.style.display = 'block';
 
   // Attach stream once we show the exam UI
@@ -1074,7 +1289,16 @@ function endExam() {
   localStorage.setItem('eyeTrackingFlags', String(eyeTrackingFlagCount));
 
   if (webcamVideo.srcObject) webcamVideo.srcObject.getTracks().forEach(t => t.stop());
-  if (document.fullscreenElement) document.exitFullscreen();
+
+  // Exit Electron kiosk/fullscreen via IPC (if running in Electron)
+  if (window.electronAPI && window.electronAPI.endExam) {
+    window.electronAPI.endExam();
+  }
+
+  // Also exit browser fullscreen as fallback
+  if (document.fullscreenElement) {
+    document.exitFullscreen().catch(() => {});
+  }
 
   alert('Exam session ended. Your data has been recorded by ARGUS.');
   window.location.href = 'dashboard.html';
