@@ -204,6 +204,8 @@ let examCode = '';
 let warningQueue = [];
 let showingWarning = false;
 let faceDetectionInterval = null;
+let headTurnInterval = null;
+let headTurnTimer = null;
 let snapshots = [];
 let webcamStream = null;
 let proctoringAttached = false;
@@ -220,7 +222,8 @@ let calibratedPoints = 0;
 let isRecalibrating = false;
 let timerPausedAt = 0;
 const calibrationClicks = {};
-const LOOK_AWAY_THRESHOLD_MS = 2000;
+const LOOK_AWAY_THRESHOLD_MS = 1000;
+let nullDataCount = 0;
 
 // ── Elements ──
 const landingScreen = document.getElementById('landingScreen');
@@ -527,10 +530,14 @@ async function startEyeTracking() {
 
     webgazer.getCurrentPrediction().then(function(prediction) {
       if (!prediction) {
-        console.log('[ARGUS] Prediction: null — face not detected');
+        nullDataCount++;
+        console.log('[ARGUS] Prediction: null — face not detected (count: ' + nullDataCount + ')');
+        if (nullDataCount > 15) {
+          handleLookingAway('Student looked away from screen');
+        }
         if (!lookAwayTimer) {
           lookAwayTimer = setTimeout(function() {
-            console.log('[ARGUS] FLAGGING: looking away (face lost for 2s)');
+            console.log('[ARGUS] FLAGGING: looking away (face lost for 1s)');
             handleLookingAway('Student looked away from screen');
             lookAwayTimer = null;
           }, LOOK_AWAY_THRESHOLD_MS);
@@ -542,12 +549,12 @@ async function startEyeTracking() {
       var screenW = Math.max(document.documentElement.clientWidth, window.innerWidth || 0);
       var screenH = Math.max(document.documentElement.clientHeight, window.innerHeight || 0);
 
-      // Asymmetric padding: 100px left/top/bottom, 200px right
+      // Boundary padding: 150px left/top/bottom, 250px right
       var isOutside =
-        prediction.x < 100 ||
-        prediction.x > screenW - 200 ||
-        prediction.y < 100 ||
-        prediction.y > screenH - 100;
+        prediction.x < 150 ||
+        prediction.x > screenW - 250 ||
+        prediction.y < 150 ||
+        prediction.y > screenH - 150;
 
       console.log('[ARGUS] Gaze:', Math.round(prediction.x), Math.round(prediction.y),
         'Screen:', screenW, screenH, 'Outside:', isOutside);
@@ -569,6 +576,7 @@ async function startEyeTracking() {
         clearTimeout(lookAwayTimer);
         lookAwayTimer = null;
       }
+      nullDataCount = 0;
       if (isLookingAway) {
         isLookingAway = false;
         updateEyeTrackingIndicator(false);
@@ -921,10 +929,14 @@ function attachProctoring() {
 async function initFaceDetection() {
   if (typeof faceapi === 'undefined') { console.warn('face-api.js not loaded'); return; }
   try {
-    const MODEL_URL = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/';
-    await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
-    console.log('Face detection model loaded');
+    const MODEL_URL = 'https://justadudewhohacks.github.io/face-api.js/models';
+    await Promise.all([
+      faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
+      faceapi.nets.faceLandmark68TinyNet.loadFromUri(MODEL_URL)
+    ]);
+    console.log('[ARGUS] All face-api models loaded');
 
+    // Existing face count check every 8s
     faceDetectionInterval = setInterval(async () => {
       if (!webcamVideo.srcObject) return;
       try {
@@ -933,7 +945,112 @@ async function initFaceDetection() {
         else if (detections.length > 1) addFlag('multiple_faces', `Multiple faces detected (${detections.length} faces)`);
       } catch(e) {}
     }, 8000);
+
+    // Head turn detection every 1000ms
+    headTurnInterval = setInterval(async () => {
+      if (!examActive) return;
+      await checkHeadPose();
+    }, 1000);
   } catch (e) { console.warn('Face detection init failed:', e); }
+}
+
+async function checkHeadPose() {
+  try {
+    // Guard: don't run if models not loaded
+    if (!faceapi.nets.tinyFaceDetector.isLoaded) {
+      console.log('[ARGUS] Models not ready yet');
+      return;
+    }
+
+    const video = document.querySelector('video[id*="webcam"], #webcamVideo, video');
+    if (!video) return;
+
+    const detection = await faceapi.detectSingleFace(video, new faceapi.TinyFaceDetectorOptions()).withFaceLandmarks(true);
+    if (!detection) return;
+
+    const landmarks = detection.landmarks;
+    const nose = landmarks.getNose();
+    const jaw = landmarks.getJawOutline();
+
+    // Get nose tip (index 3)
+    const noseTip = nose[3];
+
+    // Get jaw left and right points
+    const jawLeft = jaw[0];
+    const jawRight = jaw[jaw.length - 1];
+
+    // Calculate face center x
+    const faceCenterX = (jawLeft.x + jawRight.x) / 2;
+
+    // Face width
+    const faceWidth = jawRight.x - jawLeft.x;
+
+    // How far nose is from center relative to face width
+    const noseOffset = Math.abs(noseTip.x - faceCenterX);
+    const ratio = noseOffset / faceWidth;
+
+    console.log('[ARGUS] Nose offset ratio:', ratio.toFixed(2));
+
+    // If nose is more than 20% off center = head turned
+    if (ratio > 0.20) {
+      console.log('[ARGUS] HEAD TURN DETECTED:', ratio.toFixed(2));
+
+      if (!headTurnTimer) {
+        headTurnTimer = setTimeout(() => {
+          if (!eyeFlagCooldown) {
+            eyeFlagCooldown = true;
+            addFlag('head_turn', 'Student turned head away from screen');
+            setTimeout(() => {
+              eyeFlagCooldown = false;
+            }, 5000);
+          }
+          headTurnTimer = null;
+        }, 1000);
+      }
+    } else {
+      if (headTurnTimer) {
+        clearTimeout(headTurnTimer);
+        headTurnTimer = null;
+      }
+    }
+
+    // ── Vertical gaze detection (looking down / up) ──
+    // Get face bounding box
+    const box = detection.detection.box;
+
+    // Get nose tip y position
+    const noseTipY = nose[3];
+
+    // Face height
+    const faceHeight = box.height;
+
+    // How far nose is from top of face box
+    const noseVerticalRatio = (noseTipY.y - box.y) / faceHeight;
+
+    console.log('[ARGUS] Nose vertical ratio:', noseVerticalRatio.toFixed(2));
+
+    // Normal looking forward = ~0.55-0.65
+    // Looking down = ratio increases > 0.75
+    // Looking up = ratio decreases < 0.40
+    if (noseVerticalRatio > 0.75 || noseVerticalRatio < 0.40) {
+      console.log('[ARGUS] VERTICAL GAZE DETECTED:', noseVerticalRatio.toFixed(2));
+
+      if (!headTurnTimer) {
+        headTurnTimer = setTimeout(() => {
+          if (!eyeFlagCooldown) {
+            eyeFlagCooldown = true;
+            addFlag('head_turn', noseVerticalRatio > 0.75 ? 'Student looked down' : 'Student looked up');
+            setTimeout(() => {
+              eyeFlagCooldown = false;
+            }, 5000);
+          }
+          headTurnTimer = null;
+        }, 800);
+      }
+    }
+  } catch (e) {
+    // silently ignore
+  }
 }
 
 // ── End Exam ──
@@ -944,6 +1061,8 @@ function endExam() {
   clearInterval(timerInterval);
   clearInterval(snapshotInterval);
   if (faceDetectionInterval) clearInterval(faceDetectionInterval);
+  if (headTurnInterval) clearInterval(headTurnInterval);
+  if (headTurnTimer) { clearTimeout(headTurnTimer); headTurnTimer = null; }
   stopEyeTracking();
 
   captureSnapshot('exam_end');
