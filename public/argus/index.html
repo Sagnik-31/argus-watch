@@ -581,15 +581,16 @@ async function startEyeTracking() {
       var screenW = Math.max(document.documentElement.clientWidth, window.innerWidth || 0);
       var screenH = Math.max(document.documentElement.clientHeight, window.innerHeight || 0);
 
-      // Boundary padding: 150px left/top/bottom, 250px right
+      // Boundary padding: 150px left/top, 250px right, 300px bottom (WebGazer underestimates down gaze)
       var isOutside =
         prediction.x < 150 ||
         prediction.x > screenW - 250 ||
         prediction.y < 150 ||
-        prediction.y > screenH - 150;
+        prediction.y > screenH - 300;
 
       console.log('[ARGUS] Gaze:', Math.round(prediction.x), Math.round(prediction.y),
-        'Screen:', screenW, screenH, 'Outside:', isOutside);
+        'Screen:', screenW, screenH, 'Outside:', isOutside,
+        'y threshold:', screenH - 300);
 
       // ── OUTSIDE SCREEN BOUNDS ──
       if (isOutside) {
@@ -1161,11 +1162,11 @@ async function initFaceDetection() {
       } catch(e) {}
     }, 8000);
 
-    // Head turn detection every 1000ms
+    // Head turn detection every 200ms
     headTurnInterval = setInterval(async () => {
       if (!examActive) return;
       await checkHeadPose();
-    }, 1000);
+    }, 200);
   } catch (e) { console.warn('Face detection init failed:', e); }
 }
 
@@ -1220,7 +1221,7 @@ async function checkHeadPose() {
             }, 5000);
           }
           headTurnTimer = null;
-        }, 1000);
+        }, 400);
       }
     } else {
       if (headTurnTimer) {
@@ -1244,23 +1245,38 @@ async function checkHeadPose() {
 
     console.log('[ARGUS] Nose vertical ratio:', noseVerticalRatio.toFixed(2));
 
-    // Normal looking forward = ~0.55-0.65
-    // Looking down = ratio increases > 0.75
-    // Looking up = ratio decreases < 0.40
-    if (noseVerticalRatio > 0.75 || noseVerticalRatio < 0.40) {
-      console.log('[ARGUS] VERTICAL GAZE DETECTED:', noseVerticalRatio.toFixed(2));
+    // Normal looking forward = ~0.40-0.55
+    // Looking down = ratio increases > 0.57
+    // Looking up = ratio decreases < 0.45
+    if (noseVerticalRatio > 0.57) {
+      console.log('[ARGUS] LOOKING DOWN DETECTED:', noseVerticalRatio.toFixed(2));
 
       if (!headTurnTimer) {
         headTurnTimer = setTimeout(() => {
           if (!eyeFlagCooldown) {
             eyeFlagCooldown = true;
-            addFlag('head_turn', noseVerticalRatio > 0.75 ? 'Student looked down' : 'Student looked up');
+            addFlag('head_turn', 'Student looked down - possibly cheating from phone');
             setTimeout(() => {
               eyeFlagCooldown = false;
             }, 5000);
           }
           headTurnTimer = null;
-        }, 800);
+        }, 400);
+      }
+    } else if (noseVerticalRatio < 0.45) {
+      console.log('[ARGUS] LOOKING UP DETECTED:', noseVerticalRatio.toFixed(2));
+
+      if (!headTurnTimer) {
+        headTurnTimer = setTimeout(() => {
+          if (!eyeFlagCooldown) {
+            eyeFlagCooldown = true;
+            addFlag('head_turn', 'Student looked up from screen');
+            setTimeout(() => {
+              eyeFlagCooldown = false;
+            }, 5000);
+          }
+          headTurnTimer = null;
+        }, 300);
       }
     }
   } catch (e) {
