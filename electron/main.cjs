@@ -4,23 +4,23 @@ const http = require('http')
 
 let mainWindow
 let examEnded = false
+let examStarted = false
 
 function createWindow() {
   mainWindow = new BrowserWindow({
-    width: 1920,
-    height: 1080,
-    fullscreen: true,
-    kiosk: true,
+    width: 1280,
+    height: 800,
+    fullscreen: false,
+    kiosk: false,
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
       webSecurity: true,
       preload: path.join(__dirname, 'preload.cjs')
     },
-    // Remove default titlebar
-    frame: false,
-    // Prevent closing
-    closable: false
+    // Show titlebar initially (before exam starts)
+    frame: true,
+    closable: true
   })
 
   // Auto-grant camera/microphone permissions for proctoring
@@ -51,9 +51,9 @@ function createWindow() {
     )
   }
 
-  // Prevent window from closing UNLESS exam has ended
+  // Prevent window from closing UNLESS exam has ended (only after exam started)
   mainWindow.on('close', (e) => {
-    if (!examEnded) {
+    if (examStarted && !examEnded) {
       e.preventDefault()
     }
   })
@@ -62,8 +62,8 @@ function createWindow() {
   mainWindow.webContents.on(
     'before-input-event',
     (event, input) => {
-      // After exam ends, don't block anything
-      if (examEnded) return
+      // Only block shortcuts after exam starts
+      if (!examStarted || examEnded) return
 
       // Block Alt+F4
       if (input.alt && input.key === 'F4') {
@@ -85,6 +85,35 @@ function createWindow() {
   )
 }
 
+// Handle exam-started IPC — lock into kiosk mode
+ipcMain.on('exam-started', () => {
+  console.log('[ARGUS] Student accepted disclaimer — entering fullscreen/kiosk mode')
+  examStarted = true
+
+  if (mainWindow) {
+    // Close DevTools first — docked DevTools blocks fullscreen on macOS
+    if (mainWindow.webContents.isDevToolsOpened()) {
+      mainWindow.webContents.closeDevTools()
+    }
+
+    mainWindow.setClosable(false)
+
+    // Use setSimpleFullScreen for immediate effect on macOS, then kiosk
+    mainWindow.setSimpleFullScreen(true)
+    setTimeout(() => {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.setFullScreen(true)
+        mainWindow.setKiosk(true)
+        console.log('[ARGUS] Fullscreen + kiosk mode activated')
+      }
+    }, 300)
+  }
+
+  // Register global shortcuts to block system keys
+  globalShortcut.register('CommandOrControl+Q', () => {})
+  globalShortcut.register('Alt+F4', () => {})
+})
+
 // Handle exam-ended IPC from renderer
 ipcMain.on('exam-ended', () => {
   console.log('[ARGUS] Exam ended — exiting kiosk/fullscreen mode')
@@ -97,8 +126,6 @@ ipcMain.on('exam-ended', () => {
     mainWindow.setFullScreen(false)
     // Re-enable closing
     mainWindow.setClosable(true)
-    // Show the frame/titlebar so user can close normally
-    // (frame can't be changed at runtime, but closable + non-kiosk is enough)
   }
 
   // Unregister global shortcuts so user can use their system normally
@@ -127,16 +154,7 @@ function detectPort(preferredPort) {
 
 app.whenReady().then(() => {
   createWindow()
-
-  // Block system shortcuts
-  globalShortcut.register(
-    'CommandOrControl+Q',
-    () => {}
-  )
-  globalShortcut.register(
-    'Alt+F4',
-    () => {}
-  )
+  // Don't register shortcuts yet — they'll be registered when exam starts
 })
 
 // Prevent all windows from closing UNLESS exam ended

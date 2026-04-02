@@ -16,17 +16,62 @@
     <div class="landing-card">
       <span class="logo-icon">👁</span>
       <div class="logo-text">ARGUS</div>
-      <div class="tagline">AI that never blinks</div>
+      <div class="tagline">Secure · Smart · Supervised</div>
 
       <div class="input-group">
         <label>Student Name</label>
-        <input type="text" id="studentName" placeholder="Enter your full name" autocomplete="off">
+        <input type="text" id="studentName" placeholder="e.g. Sagnik Ghosh" autocomplete="off">
       </div>
       <div class="input-group">
         <label>Exam Code</label>
-        <input type="text" id="examCode" placeholder="Enter exam code" autocomplete="off">
+        <input type="text" id="examCode" placeholder="e.g. AI-MID-2026" autocomplete="off">
       </div>
       <button class="btn-primary" id="startExamBtn">Begin Exam Session</button>
+    </div>
+  </div>
+
+  <!-- ── Disclaimer Modal ── -->
+  <div class="disclaimer-overlay" id="disclaimerModal" style="display:none;">
+    <div class="disclaimer-card">
+      <div class="disclaimer-header">
+        <span class="disclaimer-icon">📋</span>
+        <h2 class="disclaimer-title">Exam Guidelines & Terms</h2>
+      </div>
+      <div class="disclaimer-body">
+        <div class="disclaimer-info-box">
+          <span class="info-icon">⏱</span>
+          <div>
+            <strong>Duration:</strong> 30 Minutes
+            <div class="info-sub">The timer starts once you click "Start Exam" below.</div>
+          </div>
+        </div>
+
+        <h3 class="disclaimer-section-title">🔒 Proctoring Rules</h3>
+        <ul class="disclaimer-rules">
+          <li><strong>Webcam & Microphone</strong> — Your camera and microphone will remain active throughout the exam for identity verification and audio monitoring.</li>
+          <li><strong>Fullscreen Mode</strong> — The exam will run in fullscreen. Exiting fullscreen will be flagged as suspicious activity.</li>
+          <li><strong>Eye Tracking</strong> — ARGUS tracks your gaze direction. Looking away from the screen for extended periods will be flagged.</li>
+          <li><strong>Tab Switching</strong> — Switching tabs or windows is prohibited and will be automatically detected.</li>
+          <li><strong>Copy/Paste Disabled</strong> — All clipboard operations are blocked during the exam.</li>
+          <li><strong>Right-Click Disabled</strong> — Context menus are disabled throughout the exam.</li>
+        </ul>
+
+        <h3 class="disclaimer-section-title">🚨 How Flags Work</h3>
+        <ul class="disclaimer-rules">
+          <li><strong>Face Mismatch</strong> — If a different face is detected, it will be flagged as a <span style="color:var(--danger);font-weight:700;">HIGH RISK</span> event.</li>
+          <li><strong>Audio Detection</strong> — Whispering, talking, or any suspicious audio above ambient noise levels will trigger a flag.</li>
+          <li><strong>Multiple Faces</strong> — If more than one face appears on camera, it will be flagged immediately.</li>
+          <li><strong>Suspicion Score</strong> — Each flag contributes to a suspicion score (0–100). Your session will be reviewed by an invigilator using AI analysis.</li>
+        </ul>
+
+        <div class="disclaimer-warning">
+          ⚠️ All activity is recorded and will be reviewed. Any attempt to circumvent proctoring measures will result in automatic escalation.
+        </div>
+      </div>
+      <div class="disclaimer-footer">
+        <button class="disclaimer-btn disclaimer-btn-exit" id="disclaimerExitBtn">← Exit</button>
+        <button class="disclaimer-btn disclaimer-btn-start" id="disclaimerStartBtn">I Agree — Start Exam →</button>
+      </div>
     </div>
   </div>
 
@@ -96,19 +141,61 @@
     <div class="exam-topbar">
       <div class="topbar-left">
         <span class="topbar-logo">👁</span>
-        <span class="topbar-title">ARGUS</span>
+        <span class="topbar-title">ARGUS <span class="topbar-ai">AI</span></span>
       </div>
+      <div class="topbar-center" id="examTitleBar">Artificial Intelligence — Midterm Exam</div>
       <div class="topbar-right">
-        <div class="suspicion-badge" id="suspicionBadge">
-          ⚠ Flags: <strong id="flagCount">0</strong>
+        <div class="timer-display" id="timerDisplay">
+          <span class="timer-label">Time Remaining</span>
+          <span class="timer-value" id="timerValue">00 : 30 : 00</span>
         </div>
-        <div class="timer-display" id="timerDisplay">30:00</div>
+        <div class="proctoring-badge">
+          <span class="proctoring-dot"></span>
+          Proctoring On
+        </div>
       </div>
     </div>
 
-    <!-- Exam Content -->
-    <div class="exam-content" id="examContent">
-      <!-- Questions injected by JS -->
+    <!-- Exam Layout -->
+    <div class="exam-layout">
+      <!-- Sidebar -->
+      <aside class="exam-sidebar">
+        <div class="sidebar-card">
+          <div class="sidebar-card-title">Exam Information</div>
+          <div class="exam-meta-row"><span class="meta-label">Date</span><span class="meta-value" id="examDate">April 3, 2026</span></div>
+          <div class="exam-meta-row"><span class="meta-label">Duration</span><span class="meta-value">30 Minutes</span></div>
+          <div class="exam-meta-row"><span class="meta-label">Subject</span><span class="meta-value">Artificial Intelligence</span></div>
+        </div>
+
+        <div class="sidebar-card">
+          <div class="sidebar-card-title">Question Map</div>
+          <div class="question-grid" id="questionGrid"></div>
+          <div class="question-legend">
+            <span class="legend-item"><span class="legend-dot legend-current"></span>Current</span>
+            <span class="legend-item"><span class="legend-dot legend-answered"></span>Answered</span>
+            <span class="legend-item"><span class="legend-dot legend-review"></span>Review</span>
+            <span class="legend-item"><span class="legend-dot legend-unvisited"></span>Unvisited</span>
+          </div>
+        </div>
+
+        <div class="sidebar-card">
+          <div class="sidebar-card-title">Exam Progress</div>
+          <div class="progress-bar-container"><div class="progress-bar-fill" id="progressBarFill"></div></div>
+          <div class="progress-text" id="progressText">0 of 10 answered</div>
+          <div class="review-text" id="reviewText">0 Marked for Review</div>
+        </div>
+
+        <div class="suspicion-badge" id="suspicionBadge">
+          ⚠ Flags: <strong id="flagCount">0</strong>
+        </div>
+
+        <button class="btn-end-exam" id="endExamTrigger">Submit Exam</button>
+      </aside>
+
+      <!-- Main Content -->
+      <main class="exam-main">
+        <div class="exam-content" id="examContent"></div>
+      </main>
     </div>
 
     <!-- Webcam -->
@@ -117,8 +204,24 @@
       <div class="rec-label">REC</div>
       <video id="webcamVideo" autoplay muted playsinline></video>
     </div>
-    <!-- Hidden canvas for snapshots -->
     <canvas id="snapshotCanvas" style="display:none;"></canvas>
+  </div>
+
+  <!-- ── End Exam Modal ── -->
+  <div class="end-exam-overlay" id="endExamModal" style="display:none;">
+    <div class="end-exam-card">
+      <div class="warning-icon">📋</div>
+      <div class="warning-title" style="color: var(--accent);">Submit Exam</div>
+      <div class="warning-text">Enter the exam password to submit your answers. This action cannot be undone.</div>
+      <div class="input-group">
+        <label>Exam Password</label>
+        <input type="password" id="endPassword" placeholder="Enter password to submit">
+      </div>
+      <div style="display:flex;gap:10px;margin-top:8px;">
+        <button class="btn-primary" id="endExamBtn" style="background:var(--danger);">Submit & End</button>
+        <button class="btn-primary" id="cancelEndBtn" style="background:var(--bg-primary);border:1px solid var(--border);color:var(--text-secondary);">Cancel</button>
+      </div>
+    </div>
   </div>
 
   <!-- ── Warning Popup ── -->
@@ -239,6 +342,11 @@ const calibrationClicks = {};
 const LOOK_AWAY_THRESHOLD_MS = 1000;
 let nullDataCount = 0;
 
+// ── Question Navigation ──
+let currentQuestionIndex = 0;
+let questionAnswers = [];
+let questionMarkedForReview = [];
+
 // ── Face Mismatch Detection ──
 let referenceFaceDescriptor = null;
 let faceMismatchCooldown = false;
@@ -318,6 +426,7 @@ const examScreen = document.getElementById('examScreen');
 const startExamBtn = document.getElementById('startExamBtn');
 const eyeTrackingIndicator = document.getElementById('eyeTrackingIndicator');
 const timerDisplay = document.getElementById('timerDisplay');
+const timerValueEl = document.getElementById('timerValue');
 const flagCountEl = document.getElementById('flagCount');
 const suspicionBadge = document.getElementById('suspicionBadge');
 const warningOverlay = document.getElementById('warningOverlay');
@@ -328,54 +437,32 @@ const fullscreenReturnBtn = document.getElementById('fullscreenReturnBtn');
 const webcamVideo = document.getElementById('webcamVideo');
 const examContent = document.getElementById('examContent');
 const snapshotCanvas = document.getElementById('snapshotCanvas');
+const questionGridEl = document.getElementById('questionGrid');
+const progressBarFill = document.getElementById('progressBarFill');
+const progressText = document.getElementById('progressText');
+const reviewText = document.getElementById('reviewText');
 
-// ── Render Questions ──
+// ── Render Questions (Single Question View) ──
 function renderQuestions() {
-  let html = '';
-  questions.forEach((q, i) => {
-    html += `<div class="exam-question-card" style="animation-delay:${i * 0.08}s">`;
-    html += `<div class="question-number">Question ${i + 1} <span class="q-type-badge q-type-${q.type}">${formatType(q.type)}</span></div>`;
-    html += `<div class="question-text">${q.text}</div>`;
+  // Initialize state arrays
+  questionAnswers = questions.map(() => null);
+  questionMarkedForReview = questions.map(() => false);
+  currentQuestionIndex = 0;
 
-    if (q.type === 'essay') {
-      html += `<textarea class="answer-area" placeholder="Type your detailed answer here..." data-q="${i}"></textarea>`;
-    } else if (q.type === 'short_answer') {
-      html += `<input type="text" class="answer-input" placeholder="Type your answer here..." data-q="${i}">`;
-    } else if (q.type === 'mcq') {
-      html += `<div class="mcq-options">`;
-      q.options.forEach((opt, oi) => {
-        html += `<label class="mcq-option">
-          <input type="radio" name="q${i}" value="${oi}" data-q="${i}">
-          <span class="mcq-letter">${String.fromCharCode(65 + oi)}</span>
-          <span class="mcq-text">${opt}</span>
-        </label>`;
-      });
-      html += `</div>`;
-    } else if (q.type === 'true_false') {
-      html += `<div class="tf-options">
-        <label class="tf-option">
-          <input type="radio" name="q${i}" value="true" data-q="${i}">
-          <span class="tf-btn tf-true">✓ True</span>
-        </label>
-        <label class="tf-option">
-          <input type="radio" name="q${i}" value="false" data-q="${i}">
-          <span class="tf-btn tf-false">✗ False</span>
-        </label>
-      </div>`;
-    }
+  // Render question grid in sidebar
+  renderQuestionGrid();
 
-    html += `</div>`;
+  // Render first question
+  renderCurrentQuestion();
+
+  // Wire up end exam modal
+  document.getElementById('endExamTrigger').addEventListener('click', () => {
+    document.getElementById('endExamModal').style.display = 'flex';
   });
 
-  html += `<div class="end-exam-section">
-    <div class="input-group">
-      <label>Enter password to end exam</label>
-      <input type="password" id="endPassword" placeholder="Exam end password">
-    </div>
-    <button class="btn-primary btn-danger" id="endExamBtn">End Exam</button>
-  </div>`;
-
-  examContent.innerHTML = html;
+  document.getElementById('cancelEndBtn').addEventListener('click', () => {
+    document.getElementById('endExamModal').style.display = 'none';
+  });
 
   document.getElementById('endExamBtn').addEventListener('click', () => {
     const pw = document.getElementById('endPassword').value;
@@ -383,8 +470,150 @@ function renderQuestions() {
       alert('Incorrect password. You cannot end the exam without the correct password.');
       return;
     }
+    document.getElementById('endExamModal').style.display = 'none';
     endExam();
   });
+}
+
+function renderCurrentQuestion() {
+  saveCurrentAnswer();
+  const i = currentQuestionIndex;
+  const q = questions[i];
+  const total = questions.length;
+  const isReview = questionMarkedForReview[i];
+
+  let html = '<div class="exam-question-card">';
+
+  // Header
+  html += '<div class="question-header">';
+  html += '<div class="question-number">Question ' + (i + 1) + ' of ' + total + ' <span class="q-type-badge q-type-' + q.type + '">' + formatType(q.type) + '</span></div>';
+  html += '<button class="btn-mark-review ' + (isReview ? 'marked' : '') + '" id="btnMarkReview" onclick="toggleReview()">' + (isReview ? '🚩 Marked' : '🏳 Mark for Review') + '</button>';
+  html += '</div>';
+
+  // Category
+  html += '<div class="question-category">Artificial Intelligence</div>';
+
+  // Question text
+  html += '<div class="question-text">' + q.text + '</div>';
+
+  // Answer area
+  const saved = questionAnswers[i];
+  if (q.type === 'essay') {
+    html += '<textarea class="answer-area" placeholder="Type your detailed answer here..." data-q="' + i + '" id="answerField">' + (saved || '') + '</textarea>';
+  } else if (q.type === 'short_answer') {
+    html += '<input type="text" class="answer-input" placeholder="Type your answer here..." data-q="' + i + '" id="answerField" value="' + (saved || '') + '">';
+  } else if (q.type === 'mcq') {
+    html += '<div class="mcq-options">';
+    q.options.forEach((opt, oi) => {
+      html += '<label class="mcq-option"><input type="radio" name="q' + i + '" value="' + oi + '" data-q="' + i + '" ' + (saved == oi ? 'checked' : '') + '><span class="mcq-letter">' + String.fromCharCode(65 + oi) + '</span><span class="mcq-text">' + opt + '</span></label>';
+    });
+    html += '</div>';
+  } else if (q.type === 'true_false') {
+    html += '<div class="tf-options">';
+    html += '<label class="tf-option"><input type="radio" name="q' + i + '" value="true" data-q="' + i + '" ' + (saved === 'true' ? 'checked' : '') + '><span class="tf-btn tf-true">✓ True</span></label>';
+    html += '<label class="tf-option"><input type="radio" name="q' + i + '" value="false" data-q="' + i + '" ' + (saved === 'false' ? 'checked' : '') + '><span class="tf-btn tf-false">✗ False</span></label>';
+    html += '</div>';
+  }
+
+  // Footer nav
+  html += '<div class="question-footer">';
+  html += '<button class="btn-q-nav btn-q-prev" onclick="prevQuestion()" ' + (i === 0 ? 'disabled' : '') + '>← Previous</button>';
+  html += '<button class="btn-q-clear" onclick="clearResponse()">Clear Response</button>';
+  if (i < total - 1) {
+    html += '<button class="btn-q-nav btn-q-next" onclick="saveAndNext()">Save & Next →</button>';
+  } else {
+    html += '<button class="btn-q-nav btn-q-next" onclick="saveAndNext()" style="background:var(--success);">Finish →</button>';
+  }
+  html += '</div>';
+
+  html += '</div>';
+  examContent.innerHTML = html;
+  updateQuestionGrid();
+  updateProgress();
+}
+
+function saveCurrentAnswer() {
+  if (currentQuestionIndex < 0) return;
+  const q = questions[currentQuestionIndex];
+  const i = currentQuestionIndex;
+  if (q.type === 'essay') {
+    const el = document.querySelector('#answerField');
+    if (el) questionAnswers[i] = el.value || null;
+  } else if (q.type === 'short_answer') {
+    const el = document.querySelector('#answerField');
+    if (el) questionAnswers[i] = el.value || null;
+  } else if (q.type === 'mcq' || q.type === 'true_false') {
+    const checked = document.querySelector('input[name="q' + i + '"]:checked');
+    questionAnswers[i] = checked ? checked.value : null;
+  }
+}
+
+function navigateToQuestion(index) {
+  saveCurrentAnswer();
+  currentQuestionIndex = index;
+  renderCurrentQuestion();
+}
+
+function nextQuestion() {
+  if (currentQuestionIndex < questions.length - 1) {
+    navigateToQuestion(currentQuestionIndex + 1);
+  }
+}
+
+function prevQuestion() {
+  if (currentQuestionIndex > 0) {
+    navigateToQuestion(currentQuestionIndex - 1);
+  }
+}
+
+function saveAndNext() {
+  saveCurrentAnswer();
+  if (currentQuestionIndex < questions.length - 1) {
+    navigateToQuestion(currentQuestionIndex + 1);
+  } else {
+    renderCurrentQuestion(); // refresh to show updated state
+  }
+}
+
+function clearResponse() {
+  questionAnswers[currentQuestionIndex] = null;
+  renderCurrentQuestion();
+}
+
+function toggleReview() {
+  questionMarkedForReview[currentQuestionIndex] = !questionMarkedForReview[currentQuestionIndex];
+  renderCurrentQuestion();
+}
+
+function renderQuestionGrid() {
+  let html = '';
+  questions.forEach((q, i) => {
+    html += '<button class="q-grid-btn" data-qi="' + i + '" onclick="navigateToQuestion(' + i + ')">' + (i + 1) + '</button>';
+  });
+  questionGridEl.innerHTML = html;
+}
+
+function updateQuestionGrid() {
+  const btns = questionGridEl.querySelectorAll('.q-grid-btn');
+  btns.forEach((btn, i) => {
+    btn.className = 'q-grid-btn';
+    if (i === currentQuestionIndex) {
+      btn.classList.add('q-current');
+    } else if (questionMarkedForReview[i]) {
+      btn.classList.add('q-review');
+    } else if (questionAnswers[i] !== null) {
+      btn.classList.add('q-answered');
+    }
+  });
+}
+
+function updateProgress() {
+  const answered = questionAnswers.filter(a => a !== null).length;
+  const total = questions.length;
+  const reviewCount = questionMarkedForReview.filter(r => r).length;
+  progressBarFill.style.width = (answered / total * 100) + '%';
+  progressText.textContent = answered + ' of ' + total + ' answered';
+  reviewText.textContent = reviewCount + ' Marked for Review';
 }
 
 function formatType(type) {
@@ -665,17 +894,43 @@ startExamBtn.addEventListener('click', async () => {
 
   const originalBtnText = startExamBtn.textContent;
   startExamBtn.disabled = true;
-  startExamBtn.textContent = 'Requesting camera permission...';
+  startExamBtn.textContent = 'Requesting permissions...';
 
   try {
     await ensureCameraPermission();
-    startFaceAlignmentFlow();
+    // Show disclaimer instead of immediately starting
+    startExamBtn.disabled = false;
+    startExamBtn.textContent = originalBtnText;
+    document.getElementById('disclaimerModal').style.display = 'flex';
   } catch (e) {
     alert('Camera permission is required to start the exam.');
-  } finally {
     startExamBtn.disabled = false;
     startExamBtn.textContent = originalBtnText;
   }
+});
+
+// ── Disclaimer Handlers ──
+document.getElementById('disclaimerStartBtn').addEventListener('click', () => {
+  document.getElementById('disclaimerModal').style.display = 'none';
+
+  // Activate Electron kiosk/fullscreen mode NOW (after student agrees)
+  if (window.electronAPI && window.electronAPI.startExam) {
+    window.electronAPI.startExam();
+    console.log('[ARGUS] Electron kiosk mode activated via IPC');
+  }
+
+  // Store student info in localStorage
+  localStorage.setItem('argus_student', studentName);
+  localStorage.setItem('argus_exam_code', examCode);
+
+  // Proceed to face alignment → calibration → exam
+  startFaceAlignmentFlow();
+});
+
+document.getElementById('disclaimerExitBtn').addEventListener('click', () => {
+  document.getElementById('disclaimerModal').style.display = 'none';
+  // Go back to credentials screen — NO fullscreen, NO kiosk
+  landingScreen.style.display = 'flex';
 });
 
 // ══════════════════════════════════════════
@@ -891,6 +1146,13 @@ async function startExam() {
 
   renderQuestions();
 
+  // Set dynamic exam date
+  const dateEl = document.getElementById('examDate');
+  if (dateEl) {
+    const now = new Date();
+    dateEl.textContent = now.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+  }
+
   // Only transition to the exam screen after permission + credentials
   landingScreen.style.display = 'none';
   calibrationScreen.style.display = 'none';
@@ -998,9 +1260,12 @@ function startTimer() {
 }
 
 function updateTimerDisplay() {
-  const m = Math.floor(timerSeconds / 60).toString().padStart(2, '0');
+  const h = Math.floor(timerSeconds / 3600).toString().padStart(2, '0');
+  const m = Math.floor((timerSeconds % 3600) / 60).toString().padStart(2, '0');
   const s = (timerSeconds % 60).toString().padStart(2, '0');
-  timerDisplay.textContent = `${m}:${s}`;
+  if (timerValueEl) {
+    timerValueEl.textContent = h + ' : ' + m + ' : ' + s;
+  }
 }
 
 // ── Flagging ──
