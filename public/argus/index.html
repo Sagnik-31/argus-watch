@@ -99,7 +99,6 @@
         <span class="topbar-title">ARGUS</span>
       </div>
       <div class="topbar-right">
-        <button class="recalibrate-btn" id="recalibrateBtn" title="Recalibrate eye tracking" style="display:none;">🔄 Recalibrate</button>
         <div class="suspicion-badge" id="suspicionBadge">
           ⚠ Flags: <strong id="flagCount">0</strong>
         </div>
@@ -142,31 +141,7 @@
     </div>
   </div>
 
-  <!-- ── Recalibration Prompt Modal ── -->
-  <div class="warning-overlay" id="recalibrationModal" style="display:none;">
-    <div class="warning-card" style="border-color: var(--warning);">
-      <div class="warning-icon">🎯</div>
-      <div class="warning-title" style="color: var(--warning);">Poor Calibration Detected</div>
-      <div class="warning-text">Eye tracking calibration may be inaccurate. Recalibrating can improve tracking quality.</div>
-      <div class="recalib-btn-group">
-        <button class="warning-dismiss" id="recalibrationRecalibrateBtn" style="background: var(--accent);">Recalibrate</button>
-        <button class="warning-dismiss" id="recalibrationContinueBtn" style="background: var(--bg-secondary); border: 1px solid var(--border);">Continue Anyway</button>
-      </div>
-    </div>
-  </div>
 
-  <!-- ── Recalibration Confirm Modal ── -->
-  <div class="warning-overlay" id="recalibConfirmModal" style="display:none;">
-    <div class="warning-card" style="border-color: var(--accent);">
-      <div class="warning-icon">🔄</div>
-      <div class="warning-title" style="color: var(--accent);">Recalibrate Eye Tracking?</div>
-      <div class="warning-text">The exam will be paused while you recalibrate. This action will be logged.</div>
-      <div class="recalib-btn-group">
-        <button class="warning-dismiss" id="recalibConfirmYes" style="background: var(--accent);">Pause &amp; Recalibrate</button>
-        <button class="warning-dismiss" id="recalibConfirmNo" style="background: var(--bg-secondary); border: 1px solid var(--border);">Cancel</button>
-      </div>
-    </div>
-  </div>
 
 <script>
 // ══════════════════════════════════════════
@@ -259,8 +234,7 @@ let eyeFlagCooldown = false;
 let verticalTurnTimer = null;
 let verticalCooldown = false;
 let calibratedPoints = 0;
-let isRecalibrating = false;
-let timerPausedAt = 0;
+
 const calibrationClicks = {};
 const LOOK_AWAY_THRESHOLD_MS = 1000;
 let nullDataCount = 0;
@@ -436,27 +410,7 @@ function resetCalibration() {
 async function completeCalibrationAndStartExam() {
   calibrationScreen.style.display = 'none';
 
-  // If this is a recalibration (exam already started), skip accuracy check
-  if (isRecalibrating) {
-    isRecalibrating = false;
-    examScreen.style.display = 'block';
-    // Resume timer from where it was paused
-    timerSeconds = timerPausedAt;
-    updateTimerDisplay();
-    examActive = true;
-    startTimer();
-    enterFullscreen();
-    await startEyeTracking();
-    addFlag('recalibration_complete', 'Student completed recalibration at ' + new Date().toLocaleTimeString());
-    // Store recalibration event for dashboard
-    var recalibEvents = JSON.parse(localStorage.getItem('argus_recalibrations') || '[]');
-    recalibEvents.push({ timestamp: new Date().toISOString(), student: studentName });
-    localStorage.setItem('argus_recalibrations', JSON.stringify(recalibEvents));
-    console.log('[ARGUS] Recalibration complete, exam resumed');
-    return;
-  }
-
-  // First-time calibration: run accuracy check
+  // Run accuracy check
   console.log('[ARGUS] Checking calibration accuracy...');
   await webgazer.begin();
 
@@ -490,26 +444,13 @@ async function completeCalibrationAndStartExam() {
     console.log('[ARGUS] Prediction x-range:', xRange, 'samples:', predictionSamples.length);
 
     if (xRange < 50 || xRange > 1500) {
-      console.log('[ARGUS] Poor calibration detected (range:', xRange, ')');
-      showRecalibrationPrompt();
-      return;
+      console.log('[ARGUS] Calibration quality marginal (range:', xRange, '), proceeding anyway');
     }
   } else {
-    console.log('[ARGUS] Not enough samples, showing prompt');
-    showRecalibrationPrompt();
-    return;
+    console.log('[ARGUS] Not enough samples, proceeding anyway');
   }
 
-  console.log('[ARGUS] Calibration quality OK');
-  proceedToExam();
-}
-
-function showRecalibrationPrompt() {
-  document.getElementById('recalibrationModal').style.display = 'flex';
-}
-
-function proceedToExam() {
-  document.getElementById('recalibrationModal').style.display = 'none';
+  console.log('[ARGUS] Proceeding to exam');
   startExam();
   startEyeTracking();
 }
@@ -1123,57 +1064,7 @@ fullscreenReturnBtn.addEventListener('click', () => {
   hideFullscreenRequiredModal();
 });
 
-// ── Recalibration Prompt Handlers (auto-detected poor calibration) ──
-document.getElementById('recalibrationRecalibrateBtn').addEventListener('click', function() {
-  document.getElementById('recalibrationModal').style.display = 'none';
-  // Go back to calibration
-  startCalibrationFlow();
-});
 
-document.getElementById('recalibrationContinueBtn').addEventListener('click', function() {
-  document.getElementById('recalibrationModal').style.display = 'none';
-  console.log('[ARGUS] Student chose to continue with poor calibration');
-  proceedToExam();
-});
-
-// ── Manual Recalibration Button (in exam topbar) ──
-document.getElementById('recalibrateBtn').addEventListener('click', function() {
-  if (!examActive) return;
-  document.getElementById('recalibConfirmModal').style.display = 'flex';
-});
-
-document.getElementById('recalibConfirmNo').addEventListener('click', function() {
-  document.getElementById('recalibConfirmModal').style.display = 'none';
-});
-
-document.getElementById('recalibConfirmYes').addEventListener('click', function() {
-  document.getElementById('recalibConfirmModal').style.display = 'none';
-
-  // Flag the recalibration request
-  addFlag('recalibration_requested', 'Student requested recalibration at ' + new Date().toLocaleTimeString());
-
-  // Pause exam
-  examActive = false;
-  timerPausedAt = timerSeconds;
-  clearInterval(timerInterval);
-  console.log('[ARGUS] Exam paused for recalibration. Timer paused at', timerPausedAt, 'seconds');
-
-  // Stop eye tracking
-  stopEyeTracking();
-
-  // Clear webgazer data for fresh calibration
-  if (typeof webgazer !== 'undefined') {
-    try {
-      if (typeof webgazer.clearData === 'function') webgazer.clearData();
-    } catch (e) {}
-    try { webgazer.end(); } catch (e) {}
-  }
-
-  // Hide exam, show calibration
-  examScreen.style.display = 'none';
-  isRecalibrating = true;
-  startCalibrationFlow();
-});
 
 // ── Proctoring Listeners ──
 function attachProctoring() {

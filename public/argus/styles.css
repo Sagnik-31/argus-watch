@@ -531,37 +531,7 @@ body {
   background: #dc2626;
 }
 
-/* ── Recalibrate Button ── */
-.recalibrate-btn {
-  padding: 6px 14px;
-  background: transparent;
-  color: var(--text-secondary);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  font-family: 'Poppins', sans-serif;
-  font-size: 12px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.3s;
-  letter-spacing: 0.5px;
-}
 
-.recalibrate-btn:hover {
-  border-color: var(--accent);
-  color: var(--accent);
-  background: var(--accent-dim);
-}
-
-.recalib-btn-group {
-  display: flex;
-  gap: 10px;
-  justify-content: center;
-}
-
-.recalib-btn-group .warning-dismiss {
-  flex: 1;
-  max-width: 180px;
-}
 
 /* ── Dashboard ── */
 .dashboard {
