@@ -65,6 +65,22 @@
       <!-- Recalibration Notifications -->
       <div id="recalibNotifications" style="display:none; margin-bottom:20px;"></div>
 
+      <!-- Face Mismatch Alerts -->
+      <div id="faceMismatchAlerts" style="display:none; margin-bottom:20px;"></div>
+
+      <!-- Registered Face -->
+      <div id="referenceFaceSection" style="display:none; margin-bottom:24px;">
+        <div class="section-title">🪪 Registered Identity</div>
+        <div style="display:flex;align-items:center;gap:20px;background:var(--bg-secondary);border:1px solid var(--border);border-radius:14px;padding:16px 20px;">
+          <img id="referenceFaceImg" src="" alt="Reference Face" style="width:120px;height:90px;object-fit:cover;border-radius:10px;border:2px solid var(--accent);">
+          <div>
+            <div style="font-weight:600;color:var(--text-primary);font-size:15px;">📸 Reference Face</div>
+            <div style="color:var(--text-muted);font-size:13px;margin-top:4px;">Captured at exam start for identity verification</div>
+            <div id="referenceFaceStatus" style="margin-top:8px;font-size:12px;"></div>
+          </div>
+        </div>
+      </div>
+
       <!-- Webcam Snapshots -->
       <div class="section-title">📸 Webcam Snapshots</div>
       <div class="snapshots-gallery" id="snapshotsGallery">
@@ -157,9 +173,11 @@ function loadDashboard() {
   const scoreMap = {
     'tab_switch': 15, 'fullscreen_exit': 15, 'copy_attempt': 20,
     'right_click': 10, 'multiple_faces': 25, 'no_face': 10, 'gaze_away': 8,
-    'recalibration_requested': 5, 'recalibration_complete': 0
+    'recalibration_requested': 5, 'recalibration_complete': 0,
+    'face_mismatch': 35
   };
   let score = 0;
+  const faceMismatchCount = flags.filter(f => f.type === 'face_mismatch').length;
   flags.forEach(f => { score += scoreMap[f.type] || 10; });
   score = Math.min(score, 100);
 
@@ -181,12 +199,14 @@ function loadDashboard() {
     tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:24px;color:var(--text-muted);">No flags recorded — student appears clean</td></tr>';
   } else {
     tbody.innerHTML = flags.map((f, i) => {
-      const severe = ['multiple_faces', 'copy_attempt', 'recalibration_requested'].includes(f.type);
-      return `<tr>
+      const isMismatch = f.type === 'face_mismatch';
+      const severe = isMismatch || ['multiple_faces', 'copy_attempt', 'recalibration_requested'].includes(f.type);
+      const rowStyle = isMismatch ? 'background:rgba(255,23,68,0.08);' : '';
+      return `<tr style="${rowStyle}">
         <td>${i + 1}</td>
         <td>${new Date(f.timestamp).toLocaleTimeString()}</td>
         <td>${formatDuration(f.elapsedSeconds)}</td>
-        <td><span class="flag-type-badge ${severe ? 'severe' : ''}">${f.type.replace(/_/g, ' ')}</span></td>
+        <td><span class="flag-type-badge ${severe ? 'severe' : ''}" ${isMismatch ? 'style="background:#ff1744;color:#fff;"' : ''}>${f.type.replace(/_/g, ' ')}${isMismatch ? ' 🚨' : ''}</span></td>
         <td>${f.detail}</td>
       </tr>`;
     }).join('');
@@ -222,6 +242,38 @@ function loadDashboard() {
     }).join('');
   } else {
     recalibContainer.style.display = 'none';
+  }
+
+  // Reference face display
+  const refSnapshot = localStorage.getItem('argus_reference_snapshot');
+  const refSection = document.getElementById('referenceFaceSection');
+  if (refSnapshot) {
+    refSection.style.display = 'block';
+    document.getElementById('referenceFaceImg').src = refSnapshot;
+    const statusEl = document.getElementById('referenceFaceStatus');
+    if (faceMismatchCount > 0) {
+      statusEl.innerHTML = '<span style="background:#ff1744;color:#fff;padding:3px 10px;border-radius:6px;font-weight:600;">🚨 HIGH RISK — ' + faceMismatchCount + ' mismatch(es) detected</span>';
+    } else {
+      statusEl.innerHTML = '<span style="background:rgba(76,175,80,0.15);color:#4caf50;padding:3px 10px;border-radius:6px;font-weight:600;">✅ No mismatches detected</span>';
+    }
+  } else {
+    refSection.style.display = 'none';
+  }
+
+  // Face mismatch alerts (prominent banner)
+  const mismatchAlerts = document.getElementById('faceMismatchAlerts');
+  if (faceMismatchCount > 0) {
+    mismatchAlerts.style.display = 'block';
+    mismatchAlerts.innerHTML = '<div style="background:rgba(255,23,68,0.12);border:2px solid #ff1744;border-radius:14px;padding:18px 24px;display:flex;align-items:center;gap:14px;">' +
+      '<span style="font-size:28px;">🚨</span>' +
+      '<div>' +
+        '<div style="color:#ff1744;font-weight:700;font-size:16px;">IDENTITY MISMATCH DETECTED</div>' +
+        '<div style="color:var(--text-muted);font-size:13px;margin-top:4px;">ARGUS detected ' + faceMismatchCount + ' instance(s) where a different face appeared on camera. This is a <strong style="color:#ff1744;">critical integrity violation</strong>.</div>' +
+      '</div>' +
+      '<span style="background:#ff1744;color:#fff;padding:4px 12px;border-radius:8px;font-weight:700;font-size:12px;white-space:nowrap;">HIGH RISK</span>' +
+    '</div>';
+  } else {
+    mismatchAlerts.style.display = 'none';
   }
 }
 
@@ -309,6 +361,12 @@ analyzeBtn.addEventListener('click', async () => {
   analyzeBtn.disabled = true;
   analyzeBtn.innerHTML = '<span class="spinner"></span>Analyzing...';
 
+  // Count face mismatches for AI context
+  const mismatchFlags = flags.filter(f => f.type === 'face_mismatch');
+  const mismatchContext = mismatchFlags.length > 0
+    ? `\n\n⚠️ CRITICAL — FACE MISMATCH EVENTS (${mismatchFlags.length} occurrences):\nFace mismatch detected ${mismatchFlags.length} time(s) during this exam session. This is the STRONGEST indicator of academic dishonesty — it means a DIFFERENT person appeared on camera compared to who started the exam. Treat each face mismatch event as extremely serious evidence of possible impersonation.\n\nMismatch details:\n${mismatchFlags.map(f => '- ' + f.detail + ' at ' + new Date(f.timestamp).toLocaleTimeString()).join('\n')}`
+    : '';
+
   const prompt = `You are an AI exam integrity analyzer for ARGUS proctoring system. Analyze this exam session data and give a verdict.
 
 Student: ${student}
@@ -316,7 +374,9 @@ Duration: ${typeof duration === 'number' ? formatDuration(duration) : duration}
 Total Flags: ${flags.length}
 
 Flag Details:
-${JSON.stringify(flags, null, 2)}
+${JSON.stringify(flags, null, 2)}${mismatchContext}
+
+IMPORTANT WEIGHTING: Face mismatch events (face_mismatch) should be treated as the STRONGEST indicator of cheating — even a single face mismatch should result in at minimum a SUSPICIOUS verdict. Multiple mismatches should almost certainly result in HIGH RISK.
 
 Give your response in this exact format:
 VERDICT: [CLEAN/SUSPICIOUS/HIGH RISK]

@@ -95,7 +95,7 @@
         <span class="topbar-title">ARGUS</span>
       </div>
       <div class="topbar-right">
-        <button class="recalibrate-btn" id="recalibrateBtn" title="Recalibrate eye tracking">🔄 Recalibrate</button>
+        <button class="recalibrate-btn" id="recalibrateBtn" title="Recalibrate eye tracking" style="display:none;">🔄 Recalibrate</button>
         <div class="suspicion-badge" id="suspicionBadge">
           ⚠ Flags: <strong id="flagCount">0</strong>
         </div>
@@ -258,6 +258,11 @@ let timerPausedAt = 0;
 const calibrationClicks = {};
 const LOOK_AWAY_THRESHOLD_MS = 1000;
 let nullDataCount = 0;
+
+// ── Face Mismatch Detection ──
+let referenceFaceDescriptor = null;
+let faceMismatchCooldown = false;
+let faceMismatchInterval = null;
 
 // ── Instant Warning Popup (non-blocking red overlay) ──
 function showWarningPopup(message) {
@@ -946,6 +951,7 @@ function startExam() {
   startTimer();
   initFaceDetection();
   startSnapshots();
+  captureReferenceFace();
 }
 
 // ── Fullscreen ──
@@ -1203,7 +1209,8 @@ async function initFaceDetection() {
     const MODEL_URL = 'https://justadudewhohacks.github.io/face-api.js/models';
     await Promise.all([
       faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
-      faceapi.nets.faceLandmark68TinyNet.loadFromUri(MODEL_URL)
+      faceapi.nets.faceLandmark68TinyNet.loadFromUri(MODEL_URL),
+      faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL)
     ]);
     console.log('[ARGUS] All face-api models loaded');
 
@@ -1353,6 +1360,125 @@ async function checkHeadPose() {
   }
 }
 
+// ── Face Mismatch Detection ──
+async function captureReferenceFace() {
+  try {
+    console.log('[ARGUS] Waiting 3s before capturing reference face...');
+    await new Promise(r => setTimeout(r, 3000));
+
+    // Wait for face recognition model to load
+    if (!faceapi.nets.faceRecognitionNet.isLoaded) {
+      console.log('[ARGUS] Face recognition model not loaded yet, retrying in 3s...');
+      setTimeout(captureReferenceFace, 3000);
+      return;
+    }
+
+    const video = document.querySelector('#webcamVideo, video');
+    if (!video || video.videoWidth === 0) {
+      console.log('[ARGUS] Video not ready, retrying in 2s...');
+      setTimeout(captureReferenceFace, 2000);
+      return;
+    }
+
+    const detection = await faceapi
+      .detectSingleFace(video, new faceapi.TinyFaceDetectorOptions())
+      .withFaceLandmarks(true)
+      .withFaceDescriptor();
+
+    if (detection) {
+      referenceFaceDescriptor = detection.descriptor;
+      console.log('[ARGUS] ✅ Reference face captured successfully');
+
+      // Store reference snapshot
+      try {
+        const canvas = document.createElement('canvas');
+        canvas.width = 320;
+        canvas.height = 240;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(video, 0, 0, 320, 240);
+        const refSnapshot = canvas.toDataURL('image/jpeg', 0.7);
+        localStorage.setItem('argus_reference_snapshot', refSnapshot);
+        console.log('[ARGUS] Reference face snapshot stored');
+      } catch (snapErr) {
+        console.warn('[ARGUS] Could not store reference snapshot:', snapErr);
+      }
+
+      // Show confirmation toast
+      showWarningPopup('Identity verified ✅ — Reference face captured');
+
+      // Start periodic face match checks every 30s
+      faceMismatchInterval = setInterval(() => {
+        if (!examActive) return;
+        checkFaceMatch();
+      }, 30000);
+    } else {
+      console.log('[ARGUS] Could not detect face for reference, retrying in 2s...');
+      setTimeout(captureReferenceFace, 2000);
+    }
+  } catch (e) {
+    console.warn('[ARGUS] Face capture error:', e);
+    setTimeout(captureReferenceFace, 3000);
+  }
+}
+
+async function checkFaceMatch() {
+  try {
+    if (!referenceFaceDescriptor) return;
+    if (!faceapi.nets.faceRecognitionNet.isLoaded) return;
+
+    const video = document.querySelector('#webcamVideo, video');
+    if (!video || video.videoWidth === 0) return;
+
+    const detection = await faceapi
+      .detectSingleFace(video, new faceapi.TinyFaceDetectorOptions())
+      .withFaceLandmarks(true)
+      .withFaceDescriptor();
+
+    if (!detection) return;
+
+    // Compare with reference face using euclidean distance
+    const distance = faceapi.euclideanDistance(
+      referenceFaceDescriptor,
+      detection.descriptor
+    );
+
+    console.log('[ARGUS] Face match distance:', distance.toFixed(3));
+
+    // distance < 0.4 = same person (confident match)
+    // distance 0.4-0.6 = uncertain
+    // distance > 0.6 = different person
+    if (distance > 0.6) {
+      console.log('[ARGUS] ⚠️ FACE MISMATCH DETECTED:', distance.toFixed(3));
+
+      if (!faceMismatchCooldown) {
+        faceMismatchCooldown = true;
+
+        // Show strong warning popup immediately
+        showWarningPopup('⚠️ ARGUS detected possible identity mismatch — different face detected');
+
+        // Add flag with confidence score
+        const confidence = Math.min(Math.round((distance - 0.4) * 100), 100);
+        addFlag(
+          'face_mismatch',
+          'Different face detected — possible impersonation (confidence: ' + confidence + '%, distance: ' + distance.toFixed(3) + ')'
+        );
+
+        // Longer cooldown for mismatch — 30 seconds (avoid spam)
+        setTimeout(() => {
+          faceMismatchCooldown = false;
+        }, 30000);
+      }
+    } else if (distance > 0.4 && distance <= 0.6) {
+      console.log('[ARGUS] Face uncertain:', distance.toFixed(3));
+      // Don't flag uncertain — just log it
+    } else {
+      console.log('[ARGUS] Face matched ✅:', distance.toFixed(3));
+    }
+  } catch (e) {
+    console.warn('[ARGUS] Face match check error:', e);
+  }
+}
+
 // ── End Exam ──
 function endExam() {
   examActive = false;
@@ -1364,6 +1490,7 @@ function endExam() {
   if (headTurnInterval) clearInterval(headTurnInterval);
   if (headTurnTimer) { clearTimeout(headTurnTimer); headTurnTimer = null; }
   if (verticalTurnTimer) { clearTimeout(verticalTurnTimer); verticalTurnTimer = null; }
+  if (faceMismatchInterval) { clearInterval(faceMismatchInterval); faceMismatchInterval = null; }
   stopEyeTracking();
 
   captureSnapshot('exam_end');
