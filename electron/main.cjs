@@ -1,5 +1,6 @@
-const { app, BrowserWindow, globalShortcut, ipcMain } = require('electron')
+const { app, BrowserWindow, globalShortcut, ipcMain, session } = require('electron')
 const path = require('path')
+const http = require('http')
 
 let mainWindow
 let examEnded = false
@@ -22,15 +23,31 @@ function createWindow() {
     closable: false
   })
 
+  // Auto-grant camera/microphone permissions for proctoring
+  session.defaultSession.setPermissionRequestHandler((webContents, permission, callback) => {
+    const allowed = ['media', 'mediaKeySystem', 'display-capture', 'fullscreen']
+    if (allowed.includes(permission)) {
+      console.log('[ARGUS] Auto-granted permission:', permission)
+      callback(true)
+    } else {
+      callback(false)
+    }
+  })
+
   // In development load Vite dev server
   if (process.env.NODE_ENV === 'development') {
-    mainWindow.loadURL('http://localhost:8080')
+    // Try port 8080 first, then fallback to 8081
+    detectPort(8080).then((port) => {
+      const url = `http://localhost:${port}/argus/index.html`
+      console.log('[ARGUS] Loading:', url)
+      mainWindow.loadURL(url)
+    })
     // Uncomment to debug:
     mainWindow.webContents.openDevTools()
   } else {
-    // In production load built files
+    // In production load built ARGUS page
     mainWindow.loadFile(
-      path.join(__dirname, '../dist/index.html')
+      path.join(__dirname, '../dist/argus/index.html')
     )
   }
 
@@ -87,6 +104,26 @@ ipcMain.on('exam-ended', () => {
   // Unregister global shortcuts so user can use their system normally
   globalShortcut.unregisterAll()
 })
+
+// Helper: detect which port the Vite dev server is on
+function detectPort(preferredPort) {
+  return new Promise((resolve) => {
+    const req = http.get(`http://localhost:${preferredPort}`, () => {
+      resolve(preferredPort)
+    })
+    req.on('error', () => {
+      // Try next port
+      const nextPort = preferredPort + 1
+      const req2 = http.get(`http://localhost:${nextPort}`, () => {
+        resolve(nextPort)
+      })
+      req2.on('error', () => {
+        // Fallback to preferred
+        resolve(preferredPort)
+      })
+    })
+  })
+}
 
 app.whenReady().then(() => {
   createWindow()
