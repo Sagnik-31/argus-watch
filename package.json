@@ -12,7 +12,7 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
-    "electron:dev": "concurrently \"npm run dev\" \"wait-on http://localhost:8080 && NODE_ENV=development electron .\"",
+    "electron:dev": "concurrently \"npm run dev -- --port 8080\" \"wait-on http://localhost:8080 && cross-env NODE_ENV=development electron .\"",
     "electron:build": "npm run build && electron-builder"
   },
   "build": {
@@ -91,6 +91,7 @@
     "@vitejs/plugin-react-swc": "^3.11.0",
     "autoprefixer": "^10.4.21",
     "concurrently": "^9.2.1",
+    "cross-env": "^10.1.0",
     "electron": "^41.1.1",
     "electron-builder": "^26.8.1",
     "eslint": "^9.32.0",

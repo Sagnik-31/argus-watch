@@ -253,9 +253,24 @@ let eyeFlagCooldown = false;
 let calibratedPoints = 0;
 let isRecalibrating = false;
 let timerPausedAt = 0;
+let noiseAudioContext = null;
+let noiseAnalyser = null;
+let noiseSourceNode = null;
+let noiseStream = null;
+let noiseRafId = null;
+let noiseAboveThresholdSince = null;
+let noiseFlagCooldownUntil = 0;
+let noiseMeterEl = null;
+let noiseCalibrationUntilPerf = 0;
 const calibrationClicks = {};
 const LOOK_AWAY_THRESHOLD_MS = 1000;
 let nullDataCount = 0;
+// Flag when the measured average dB rises above this absolute threshold.
+// Based on your observed range (~ -88 to -85 dB), start around -86 dB.
+const NOISE_DB_THRESHOLD = -87;
+const NOISE_DURATION_MS = 50;
+const NOISE_FLAG_COOLDOWN_MS = 5000;
+const NOISE_CALIBRATION_MS = 1500;
 
 // ── Elements ──
 const landingScreen = document.getElementById('landingScreen');
@@ -982,6 +997,151 @@ function addFlag(type, detail) {
   showWarning(detail);
 }
 
+async function startNoiseMonitoring() {
+  if (noiseAudioContext || !examActive) return;
+
+  try {
+    noiseStream = await navigator.mediaDevices.getUserMedia({
+      audio: {
+        echoCancellation: false,
+        noiseSuppression: false,
+        autoGainControl: false
+      },
+      video: false
+    });
+  } catch (e) {
+    console.warn('[ARGUS] Microphone access denied for noise detection:', e);
+    return;
+  }
+
+  noiseAudioContext = new (window.AudioContext || window.webkitAudioContext)();
+  await noiseAudioContext.resume();
+
+  noiseAnalyser = noiseAudioContext.createAnalyser();
+  noiseAnalyser.fftSize = 2048;
+  noiseAnalyser.smoothingTimeConstant = 0.85;
+  noiseAnalyser.minDecibels = -100;
+  noiseAnalyser.maxDecibels = -10;
+
+  noiseSourceNode = noiseAudioContext.createMediaStreamSource(noiseStream);
+  noiseSourceNode.connect(noiseAnalyser);
+  ensureNoiseMeter();
+
+  const freqBins = new Float32Array(noiseAnalyser.frequencyBinCount);
+
+  noiseCalibrationUntilPerf = performance.now() + NOISE_CALIBRATION_MS;
+  noiseAboveThresholdSince = null;
+
+  const sample = () => {
+    if (!noiseAnalyser || !examActive) return;
+
+    noiseAnalyser.getFloatFrequencyData(freqBins);
+    let weighted = 0;
+    let count = 0;
+
+    for (let i = 0; i < freqBins.length; i += 1) {
+      const v = freqBins[i];
+      if (!Number.isFinite(v)) continue;
+      const shifted = v + 100;
+      weighted += shifted * shifted;
+      count += 1;
+    }
+
+    const avgDb = count > 0 ? Math.sqrt(weighted / count) - 100 : -100;
+    updateNoiseMeter(avgDb);
+    const now = performance.now();
+
+    // Skip flagging during the initial background calibration window.
+    if (now < noiseCalibrationUntilPerf) {
+      noiseAboveThresholdSince = null;
+      noiseFlagCooldownUntil = 0; // ensure we can flag right after calibration
+      noiseMeterEl.textContent = `Noise: ${avgDb.toFixed(1)} dB | calibrating (${Math.ceil(noiseCalibrationUntilPerf - now)}ms) | thr >= ${NOISE_DB_THRESHOLD} dB`;
+      noiseMeterEl.style.color = '#e5e7eb';
+    } else if (avgDb >= NOISE_DB_THRESHOLD) {
+      if (noiseAboveThresholdSince === null) noiseAboveThresholdSince = now;
+
+      const sustained = now - noiseAboveThresholdSince >= NOISE_DURATION_MS;
+      const canFlag = Date.now() >= noiseFlagCooldownUntil;
+
+      if (sustained && canFlag) {
+        addFlag('noise_detected', 'Excessive background noise detected');
+        noiseFlagCooldownUntil = Date.now() + NOISE_FLAG_COOLDOWN_MS;
+        noiseAboveThresholdSince = null;
+      }
+    } else {
+      noiseAboveThresholdSince = null;
+    }
+
+    noiseRafId = requestAnimationFrame(sample);
+  };
+
+  noiseRafId = requestAnimationFrame(sample);
+}
+
+function stopNoiseMonitoring() {
+  if (noiseRafId !== null) {
+    cancelAnimationFrame(noiseRafId);
+    noiseRafId = null;
+  }
+
+  if (noiseSourceNode) {
+    noiseSourceNode.disconnect();
+    noiseSourceNode = null;
+  }
+
+  if (noiseAnalyser) {
+    noiseAnalyser.disconnect();
+    noiseAnalyser = null;
+  }
+
+  if (noiseAudioContext) {
+    noiseAudioContext.close().catch(() => {});
+    noiseAudioContext = null;
+  }
+
+  if (noiseStream) {
+    noiseStream.getTracks().forEach(t => t.stop());
+    noiseStream = null;
+  }
+
+  noiseAboveThresholdSince = null;
+  noiseFlagCooldownUntil = 0;
+  removeNoiseMeter();
+}
+
+function ensureNoiseMeter() {
+  if (noiseMeterEl) return;
+
+  noiseMeterEl = document.createElement('div');
+  noiseMeterEl.id = 'noiseMeterOverlay';
+  noiseMeterEl.style.position = 'fixed';
+  noiseMeterEl.style.top = '12px';
+  noiseMeterEl.style.right = '12px';
+  noiseMeterEl.style.zIndex = '99999';
+  noiseMeterEl.style.background = 'rgba(17, 24, 39, 0.9)';
+  noiseMeterEl.style.border = '1px solid rgba(255, 255, 255, 0.2)';
+  noiseMeterEl.style.borderRadius = '8px';
+  noiseMeterEl.style.padding = '8px 10px';
+  noiseMeterEl.style.fontSize = '12px';
+  noiseMeterEl.style.fontFamily = 'monospace';
+  noiseMeterEl.style.color = '#e5e7eb';
+  noiseMeterEl.style.pointerEvents = 'none';
+  noiseMeterEl.textContent = 'Noise: -- dB';
+  document.body.appendChild(noiseMeterEl);
+}
+
+function updateNoiseMeter(db, level) {
+  if (!noiseMeterEl) return;
+  noiseMeterEl.textContent = `Noise: ${db.toFixed(1)} dB | thr >= ${NOISE_DB_THRESHOLD} dB`;
+  noiseMeterEl.style.color = db >= NOISE_DB_THRESHOLD ? '#ef4444' : '#34d399';
+}
+
+function removeNoiseMeter() {
+  if (!noiseMeterEl) return;
+  noiseMeterEl.remove();
+  noiseMeterEl = null;
+}
+
 function showWarning(text) {
   warningQueue.push(text);
   if (!showingWarning) displayNextWarning();
@@ -1138,6 +1298,8 @@ function attachProctoring() {
     e.preventDefault();
     addFlag('right_click', 'Student attempted to right-click');
   });
+
+  startNoiseMonitoring();
 }
 
 // ── Face Detection ──
@@ -1279,6 +1441,7 @@ function endExam() {
   if (headTurnInterval) clearInterval(headTurnInterval);
   if (headTurnTimer) { clearTimeout(headTurnTimer); headTurnTimer = null; }
   stopEyeTracking();
+  stopNoiseMonitoring();
 
   captureSnapshot('exam_end');
 

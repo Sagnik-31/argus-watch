@@ -5,11 +5,15 @@ let mainWindow
 let examEnded = false
 
 function createWindow() {
+  const isDev = process.env.NODE_ENV === 'development'
+
   mainWindow = new BrowserWindow({
     width: 1920,
     height: 1080,
-    fullscreen: true,
-    kiosk: true,
+    fullscreen: !isDev,
+    kiosk: !isDev,
+    show: false,
+    title: isDev ? 'ARGUS (dev)' : 'ARGUS',
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
@@ -17,16 +21,20 @@ function createWindow() {
       preload: path.join(__dirname, 'preload.cjs')
     },
     // Remove default titlebar
-    frame: false,
+    frame: isDev,
     // Prevent closing
-    closable: false
+    closable: isDev
+  })
+
+  mainWindow.once('ready-to-show', () => {
+    mainWindow.show()
+    mainWindow.focus()
   })
 
   // In development load Vite dev server
-  if (process.env.NODE_ENV === 'development') {
+  if (isDev) {
     mainWindow.loadURL('http://localhost:8080')
-    // Uncomment to debug:
-    // mainWindow.webContents.openDevTools()
+    mainWindow.webContents.openDevTools({ mode: 'detach' })
   } else {
     // In production load built files
     mainWindow.loadFile(
@@ -36,7 +44,7 @@ function createWindow() {
 
   // Prevent window from closing UNLESS exam has ended
   mainWindow.on('close', (e) => {
-    if (!examEnded) {
+    if (!isDev && !examEnded) {
       e.preventDefault()
     }
   })
@@ -46,7 +54,7 @@ function createWindow() {
     'before-input-event',
     (event, input) => {
       // After exam ends, don't block anything
-      if (examEnded) return
+      if (isDev || examEnded) return
 
       // Block Alt+F4
       if (input.alt && input.key === 'F4') {
@@ -92,6 +100,7 @@ app.whenReady().then(() => {
   createWindow()
 
   // Block system shortcuts
+  if (process.env.NODE_ENV === 'development') return
   globalShortcut.register(
     'CommandOrControl+Q',
     () => {}
@@ -104,7 +113,7 @@ app.whenReady().then(() => {
 
 // Prevent all windows from closing UNLESS exam ended
 app.on('window-all-closed', (e) => {
-  if (!examEnded) {
+  if (process.env.NODE_ENV !== 'development' && !examEnded) {
     e.preventDefault()
   }
 })
