@@ -1,3 +1,5 @@
-# Welcome to your Lovable project
+Author - Sagnik Ghosh
 
-TODO: Document your project here
+Built end to end AI proctoring system.
+only used-
+lovable, cursor, antigravity, claude opus 4.6
