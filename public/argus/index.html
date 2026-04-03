@@ -43,22 +43,34 @@
 
       <!-- QR Code Area -->
       <div id="qrSetupArea" style="background:#f1f5f9;border-radius:16px;padding:24px;margin-bottom:16px;">
-        <div id="qrSetupCode" style="display:flex;justify-content:center;margin:0 auto;background:#0d1117;border-radius:12px;padding:12px;width:244px;height:244px;align-items:center;"></div>
+        <div id="qrSetupCode"
+          style="display:flex;justify-content:center;margin:0 auto;background:#0d1117;border-radius:12px;padding:12px;width:244px;height:244px;align-items:center;">
+        </div>
         <div style="margin-top:12px;font-size:12px;color:#64748b;text-align:center;">Or enter room code manually:</div>
-        <div id="roomCodeDisplay" style="font-size:28px;font-weight:800;letter-spacing:6px;color:#1e293b;text-align:center;margin-top:8px;font-family:monospace;">------</div>
-        <div id="phoneUrlDisplay" style="margin-top:10px;font-size:10px;color:#94a3b8;text-align:center;word-break:break-all;"></div>
-        <div style="margin-top:10px;font-size:11px;color:#f59e0b;text-align:center;font-weight:600;">⚠️ Make sure phone and laptop are on same WiFi network</div>
+        <div id="roomCodeDisplay"
+          style="font-size:28px;font-weight:800;letter-spacing:6px;color:#1e293b;text-align:center;margin-top:8px;font-family:monospace;">
+          ------</div>
+        <div id="phoneUrlDisplay"
+          style="margin-top:10px;font-size:10px;color:#94a3b8;text-align:center;word-break:break-all;"></div>
+        <div style="margin-top:10px;font-size:11px;color:#f59e0b;text-align:center;font-weight:600;">⚠️ Make sure phone
+          and laptop are on same WiFi network</div>
       </div>
 
       <!-- Connection Status -->
-      <div id="qrSetupStatus" style="display:flex;align-items:center;justify-content:center;gap:8px;padding:12px;border-radius:12px;background:rgba(239,68,68,0.06);border:1px solid rgba(239,68,68,0.15);margin-bottom:16px;">
-        <span id="qrStatusDot" style="width:10px;height:10px;border-radius:50%;background:#ef4444;animation:pulse 2s infinite;"></span>
-        <span id="qrStatusText" style="font-size:13px;font-weight:600;color:#ef4444;">Waiting for phone connection...</span>
+      <div id="qrSetupStatus"
+        style="display:flex;align-items:center;justify-content:center;gap:8px;padding:12px;border-radius:12px;background:rgba(239,68,68,0.06);border:1px solid rgba(239,68,68,0.15);margin-bottom:16px;">
+        <span id="qrStatusDot"
+          style="width:10px;height:10px;border-radius:50%;background:#ef4444;animation:pulse 2s infinite;"></span>
+        <span id="qrStatusText" style="font-size:13px;font-weight:600;color:#ef4444;">Waiting for phone
+          connection...</span>
       </div>
 
       <!-- Buttons -->
-      <button class="btn-primary" id="qrContinueBtn" disabled style="opacity:0.5;cursor:not-allowed;width:100%;margin-bottom:8px;">Continue to Exam →</button>
-      <button class="btn-primary" id="qrSkipBtn" style="background:transparent;color:#94a3b8;border:1px solid rgba(148,163,184,0.3);width:100%;font-size:12px;">Skip — Continue without secondary camera</button>
+      <button class="btn-primary" id="qrContinueBtn" disabled
+        style="opacity:0.5;cursor:not-allowed;width:100%;margin-bottom:8px;">Continue to Exam →</button>
+      <button class="btn-primary" id="qrSkipBtn"
+        style="background:transparent;color:#94a3b8;border:1px solid rgba(148,163,184,0.3);width:100%;font-size:12px;">Skip
+        — Continue without secondary camera</button>
     </div>
   </div>
 
@@ -194,7 +206,8 @@
           <span class="timer-label">Time Remaining</span>
           <span class="timer-value" id="timerValue">00 : 30 : 00</span>
         </div>
-        <div class="proctoring-badge" id="secondaryCamBadge" style="background:rgba(148,163,184,0.1);border-color:rgba(148,163,184,0.2);display:none;">
+        <div class="proctoring-badge" id="secondaryCamBadge"
+          style="background:rgba(148,163,184,0.1);border-color:rgba(148,163,184,0.2);display:none;">
           <span class="proctoring-dot" id="secondaryCamBadgeDot" style="background:#94a3b8;"></span>
           <span id="secondaryCamBadgeText">📱 Not Connected</span>
         </div>
@@ -267,7 +280,8 @@
         style="background:#fff;border:1px solid rgba(0,0,0,0.1);border-radius:14px;padding:12px;width:180px;text-align:center;box-shadow:0 4px 20px rgba(0,0,0,0.08);">
         <div style="font-size:11px;font-weight:700;color:#1e293b;margin-bottom:6px;letter-spacing:0.5px;">📱 SCAN WITH
           PHONE</div>
-        <div id="qrCanvas" style="display:flex;justify-content:center;margin:0 auto;width:140px;height:140px;align-items:center;"></div>
+        <div id="qrCanvas"
+          style="display:flex;justify-content:center;margin:0 auto;width:140px;height:140px;align-items:center;"></div>
         <div style="font-size:9px;color:#94a3b8;margin-top:6px;">Place phone facing keyboard</div>
       </div>
       <!-- Status indicator (shown after QR scanned) -->
@@ -1018,7 +1032,7 @@
     document.getElementById('qrSkipBtn').addEventListener('click', () => {
       // Clean up secondary peer if not connected
       if (secondaryPeer && !secondaryConn) {
-        try { secondaryPeer.destroy(); } catch (e) {}
+        try { secondaryPeer.destroy(); } catch (e) { }
         secondaryPeer = null;
       }
       document.getElementById('qrSetupScreen').style.display = 'none';
@@ -1047,7 +1061,7 @@
       document.getElementById('disclaimerModal').style.display = 'none';
       // Clean up secondary camera
       if (secondaryPeer) {
-        try { secondaryPeer.destroy(); } catch (e) {}
+        try { secondaryPeer.destroy(); } catch (e) { }
         secondaryPeer = null;
       }
       // Go back to credentials screen — NO fullscreen, NO kiosk
@@ -2077,7 +2091,7 @@
           console.log('[ARGUS] 📱 Peer ready, ID:', id);
 
           // Generate QR code URL pointing to mobile page
-          const phoneUrl = `http://172.27.67.154:8080/argus/mobile.html?room=${roomCode}`;
+          const phoneUrl = `http://10.128.86.154:8080/argus/mobile.html?room=${roomCode}`;
           console.log('[ARGUS] 📱 Phone URL:', phoneUrl);
 
           // Show URL as text fallback
