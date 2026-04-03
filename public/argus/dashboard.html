@@ -97,6 +97,16 @@
         <div class="snapshot-empty">No snapshots captured</div>
       </div>
 
+      <!-- Secondary Camera Snapshots -->
+      <div id="secondaryCamSection" style="display:none; margin-top:24px;">
+        <div class="section-title">📱 Secondary Camera (Keyboard Monitor)</div>
+        <!-- Object Detection Alerts -->
+        <div id="objectDetectionAlerts" style="display:none; margin-bottom:16px;"></div>
+        <div class="snapshots-gallery" id="secondaryGallery">
+          <div class="snapshot-empty">No secondary camera snapshots</div>
+        </div>
+      </div>
+
       <!-- Flags Table -->
       <div class="section-title">📋 Flagged Events</div>
       <table class="flags-table">
@@ -186,7 +196,9 @@ function loadDashboard() {
     'tab_switch': 15, 'fullscreen_exit': 15, 'copy_attempt': 20,
     'right_click': 10, 'multiple_faces': 25, 'no_face': 10, 'gaze_away': 8,
     'recalibration_requested': 5, 'recalibration_complete': 0,
-    'face_mismatch': 35, 'audio_detected': 12
+    'face_mismatch': 35, 'audio_detected': 12,
+    'secondary_object_detected': 20,
+    'secondary_camera': 18
   };
   let score = 0;
   const faceMismatchCount = flags.filter(f => f.type === 'face_mismatch').length;
@@ -212,13 +224,25 @@ function loadDashboard() {
   } else {
     tbody.innerHTML = flags.map((f, i) => {
       const isMismatch = f.type === 'face_mismatch';
+      const isDeskCam = f.type === 'secondary_camera';
+      const isObjectDetection = f.type === 'secondary_object_detected';
       const severe = isMismatch || ['multiple_faces', 'copy_attempt', 'recalibration_requested'].includes(f.type);
-      const rowStyle = isMismatch ? 'background:rgba(255,23,68,0.08);' : '';
+      const rowStyle = isMismatch ? 'background:rgba(255,23,68,0.08);' : isDeskCam ? 'background:rgba(139,92,246,0.06);' : isObjectDetection ? 'background:rgba(239,68,68,0.04);' : '';
+      let badgeHtml = '';
+      if (isMismatch) {
+        badgeHtml = `<span class="flag-type-badge severe" style="background:#ff1744;color:#fff;">${f.type.replace(/_/g, ' ')} 🚨</span>`;
+      } else if (isDeskCam) {
+        badgeHtml = `<span class="flag-type-badge" style="background:rgba(139,92,246,0.15);color:#8b5cf6;border:1px solid rgba(139,92,246,0.3);font-weight:700;">📱 DESK CAM</span>`;
+      } else if (isObjectDetection) {
+        badgeHtml = `<span class="flag-type-badge severe" style="background:rgba(239,68,68,0.12);color:#ef4444;border:1px solid rgba(239,68,68,0.3);">🚨 Object Detected</span>`;
+      } else {
+        badgeHtml = `<span class="flag-type-badge ${severe ? 'severe' : ''}">${f.type.replace(/_/g, ' ')}</span>`;
+      }
       return `<tr style="${rowStyle}">
         <td>${i + 1}</td>
         <td>${new Date(f.timestamp).toLocaleTimeString()}</td>
         <td>${formatDuration(f.elapsedSeconds)}</td>
-        <td><span class="flag-type-badge ${severe ? 'severe' : ''}" ${isMismatch ? 'style="background:#ff1744;color:#fff;"' : ''}>${f.type.replace(/_/g, ' ')}${isMismatch ? ' 🚨' : ''}</span></td>
+        <td>${badgeHtml}</td>
         <td>${f.detail}</td>
       </tr>`;
     }).join('');
@@ -287,6 +311,125 @@ function loadDashboard() {
   } else {
     mismatchAlerts.style.display = 'none';
   }
+
+  // Secondary camera snapshots
+  const secSnapshots = JSON.parse(localStorage.getItem('argus_secondary_snapshots') || '[]');
+  const secSection = document.getElementById('secondaryCamSection');
+  const secGallery = document.getElementById('secondaryGallery');
+
+  // Object detection events
+  const objectDetections = JSON.parse(localStorage.getItem('argus_object_detections') || '[]');
+  const flaggedDetections = objectDetections.filter(d => d.flagged);
+
+  // Gemini desk camera flags (type: secondary_camera)
+  const deskCamFlags = flags.filter(f => f.type === 'secondary_camera');
+
+  // Show secondary section if we have snapshots, object detections, or desk cam flags
+  if (secSnapshots.length > 0 || objectDetections.length > 0 || deskCamFlags.length > 0) {
+    secSection.style.display = 'block';
+
+    // Show Gemini desk camera alerts (purple banner)
+    if (deskCamFlags.length > 0) {
+      const objAlertSection = document.getElementById('objectDetectionAlerts');
+      const geminiAlertHtml = `
+        <div style="background:rgba(139,92,246,0.06);border:2px solid rgba(139,92,246,0.3);border-radius:14px;padding:16px 20px;margin-bottom:12px;">
+          <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;">
+            <span style="font-size:24px;">📱</span>
+            <div>
+              <div style="color:#8b5cf6;font-weight:700;font-size:15px;">GEMINI DESK CAMERA ALERTS</div>
+              <div style="color:var(--text-muted);font-size:12px;margin-top:2px;">AI vision analysis detected ${deskCamFlags.length} suspicious item(s) on student's desk via phone camera</div>
+            </div>
+            <span style="background:#8b5cf6;color:#fff;padding:4px 12px;border-radius:8px;font-weight:700;font-size:11px;white-space:nowrap;margin-left:auto;">DESK CAM 📱 · ${deskCamFlags.length}</span>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:6px;">
+            ${deskCamFlags.map(f => `<div style="background:#fff;border:1px solid rgba(139,92,246,0.15);border-radius:8px;padding:8px 12px;font-size:12px;">
+              <span style="color:#8b5cf6;font-weight:600;">📱 ${new Date(f.timestamp).toLocaleTimeString()}</span>
+              <span style="color:var(--text-secondary);margin-left:8px;">${f.detail}</span>
+            </div>`).join('')}
+          </div>
+        </div>
+      `;
+
+      // Prepend before object detection alerts
+      if (objAlertSection) {
+        objAlertSection.style.display = 'block';
+        objAlertSection.insertAdjacentHTML('afterbegin', geminiAlertHtml);
+      }
+    }
+
+    // Show object detection alert banner
+    const objAlertSection = document.getElementById('objectDetectionAlerts');
+    if (flaggedDetections.length > 0) {
+      objAlertSection.style.display = 'block';
+
+      // Get unique objects detected
+      const uniqueObjects = [...new Set(flaggedDetections.map(d => d.object))];
+      const objectEmojis = {
+        'cell phone': '📱', 'book': '📖', 'laptop': '💻',
+        'remote': '🎮', 'scissors': '✂️', 'backpack': '🎒',
+        'bottle': '🍶', 'mouse': '🖱'
+      };
+
+      objAlertSection.innerHTML = `
+        <div style="background:rgba(239,68,68,0.08);border:2px solid rgba(239,68,68,0.3);border-radius:14px;padding:16px 20px;">
+          <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;">
+            <span style="font-size:24px;">🚨</span>
+            <div>
+              <div style="color:#ef4444;font-weight:700;font-size:15px;">UNAUTHORIZED OBJECTS DETECTED ON DESK</div>
+              <div style="color:var(--text-muted);font-size:12px;margin-top:2px;">AI-powered object detection identified ${flaggedDetections.length} suspicious item(s) via secondary camera</div>
+            </div>
+            <span style="background:#ef4444;color:#fff;padding:4px 12px;border-radius:8px;font-weight:700;font-size:11px;white-space:nowrap;margin-left:auto;">⚠ ${flaggedDetections.length} ALERT(S)</span>
+          </div>
+          <div style="display:flex;flex-wrap:wrap;gap:8px;">
+            ${uniqueObjects.map(obj => {
+              const count = flaggedDetections.filter(d => d.object === obj).length;
+              const emoji = objectEmojis[obj] || '⚠️';
+              const maxConf = Math.max(...flaggedDetections.filter(d => d.object === obj).map(d => d.confidence));
+              return `<div style="background:#fff;border:1px solid rgba(239,68,68,0.2);border-radius:8px;padding:6px 12px;font-size:12px;display:flex;align-items:center;gap:6px;">
+                <span>${emoji}</span>
+                <span style="font-weight:600;color:var(--text-primary);">${obj}</span>
+                <span style="color:var(--text-muted);font-size:10px;">${count}x · ${maxConf}%</span>
+              </div>`;
+            }).join('')}
+          </div>
+          <div style="margin-top:10px;font-size:11px;color:var(--text-muted);">
+            Timeline: ${flaggedDetections.map(d => {
+              const emoji = objectEmojis[d.object] || '•';
+              return emoji + ' ' + new Date(d.timestamp).toLocaleTimeString() + ' (' + d.confidence + '%)';
+            }).join(' → ')}
+          </div>
+        </div>
+      `;
+    }
+
+    // Render snapshots
+    if (secSnapshots.length > 0) {
+      secGallery.innerHTML = secSnapshots.map((s, i) => {
+        const hasObjects = s.detectedObjects && s.detectedObjects.length > 0;
+        return `<div class="snapshot-card ${hasObjects ? 'snapshot-flagged' : ''}" onclick="openSecondaryLightbox(${i})">
+          <img src="${s.image}" alt="Secondary snapshot ${i+1}">
+          <div class="snapshot-info">
+            <span class="snapshot-time">${new Date(s.timestamp).toLocaleTimeString()}</span>
+            <span class="snapshot-reason ${hasObjects ? 'reason-flag' : ''}">📱 ${hasObjects ? '⚠ ' + s.detectedObjects.map(o => o.class).join(', ') : 'Keyboard #' + (s.count || (i+1))}</span>
+          </div>
+        </div>`;
+      }).join('');
+    } else {
+      secGallery.innerHTML = '<div class="snapshot-empty">No secondary camera snapshots</div>';
+    }
+  } else {
+    secSection.style.display = 'none';
+  }
+}
+
+function openSecondaryLightbox(index) {
+  const secSnapshots = JSON.parse(localStorage.getItem('argus_secondary_snapshots') || '[]');
+  const s = secSnapshots[index];
+  if (!s) return;
+  document.getElementById('lightboxImg').src = s.image;
+  document.getElementById('lightboxMeta').innerHTML =
+    `<strong>${new Date(s.timestamp).toLocaleString()}</strong> · 📱 Secondary Camera · Snapshot #${s.count || (index+1)}`;
+  document.getElementById('snapshotLightbox').style.display = 'flex';
 }
 
 function formatReason(r) {
@@ -390,7 +533,11 @@ ${JSON.stringify(flags, null, 2)}${mismatchContext}
 
 Audio Detection: ${flags.filter(f => f.type === 'audio_detected').length} audio flag(s) detected. Audio flags indicate the student's microphone picked up suspicious sounds like talking, whispering, or other voices nearby during the exam.
 
-IMPORTANT WEIGHTING: Face mismatch events (face_mismatch) should be treated as the STRONGEST indicator of cheating — even a single face mismatch should result in at minimum a SUSPICIOUS verdict. Multiple mismatches should almost certainly result in HIGH RISK. Audio detection events (audio_detected) are moderate indicators — multiple audio flags combined with other violations strongly suggest external help or communication.
+Secondary Camera Object Detection: ${flags.filter(f => f.type === 'secondary_object_detected').length} object(s) detected on desk/keyboard area. The secondary phone camera uses AI (COCO-SSD) to detect unauthorized items like books, phones, laptops, etc. on the student's desk. Each detection includes the object type and confidence percentage. Object detections are strong indicators of academic dishonesty — students should NOT have books, phones, or other reference materials on their desk during a proctored exam.
+
+Gemini Desk Camera Analysis: ${flags.filter(f => f.type === 'secondary_camera').length} Gemini AI vision flag(s) from desk camera. The phone's secondary camera periodically analyzes the desk area using Google Gemini vision AI. These flags indicate Gemini detected prohibited items like phones, books, cheat sheets, earbuds, or another person near the student's desk. Gemini analysis provides high-confidence contextual detection.
+
+IMPORTANT WEIGHTING: Face mismatch events (face_mismatch) should be treated as the STRONGEST indicator of cheating — even a single face mismatch should result in at minimum a SUSPICIOUS verdict. Multiple mismatches should almost certainly result in HIGH RISK. Audio detection events (audio_detected) are moderate indicators — multiple audio flags combined with other violations strongly suggest external help or communication. Secondary camera object detections (secondary_object_detected) and Gemini desk camera flags (secondary_camera) are STRONG indicators of cheating — books, phones, or other materials on the desk area strongly suggest the student is using unauthorized resources.
 
 Give your response in this exact format:
 VERDICT: [CLEAN/SUSPICIOUS/HIGH RISK]

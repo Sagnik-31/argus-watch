@@ -43,13 +43,25 @@ function createWindow() {
       mainWindow.loadURL(url)
     })
     // Uncomment to debug:
-    mainWindow.webContents.openDevTools()
+    // mainWindow.webContents.openDevTools()
   } else {
     // In production load built ARGUS page
     mainWindow.loadFile(
       path.join(__dirname, '../dist/argus/index.html')
     )
   }
+
+  // Override CSP to allow external CDN scripts, WebRTC, and data: URIs
+  mainWindow.webContents.session.webRequest.onHeadersReceived((details, callback) => {
+    callback({
+      responseHeaders: {
+        ...details.responseHeaders,
+        'Content-Security-Policy': [
+          "default-src * 'unsafe-eval' 'unsafe-inline' data: blob:"
+        ]
+      }
+    })
+  })
 
   // Prevent window from closing UNLESS exam has ended (only after exam started)
   mainWindow.on('close', (e) => {
@@ -110,8 +122,8 @@ ipcMain.on('exam-started', () => {
   }
 
   // Register global shortcuts to block system keys
-  globalShortcut.register('CommandOrControl+Q', () => {})
-  globalShortcut.register('Alt+F4', () => {})
+  globalShortcut.register('CommandOrControl+Q', () => { })
+  globalShortcut.register('Alt+F4', () => { })
 })
 
 // Handle exam-ended IPC from renderer

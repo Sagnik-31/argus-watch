@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -7,8 +8,11 @@
   <link rel="stylesheet" href="styles.css">
   <script src="https://cdn.jsdelivr.net/npm/webgazer@2.0.1/dist/webgazer.min.js"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
+  <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
 
 </head>
+
 <body>
 
   <!-- ── Landing Screen ── -->
@@ -30,6 +34,34 @@
     </div>
   </div>
 
+  <!-- ── Secondary Camera QR Setup Screen ── -->
+  <div class="landing-screen" id="qrSetupScreen" style="display:none;">
+    <div class="landing-card" style="max-width:460px;padding:36px 32px;">
+      <span class="logo-icon">📱</span>
+      <div class="logo-text" style="font-size:22px;">Setup Secondary Camera</div>
+      <div class="tagline" style="margin-bottom:20px;">Scan QR code with your phone to enable desk monitoring</div>
+
+      <!-- QR Code Area -->
+      <div id="qrSetupArea" style="background:#f1f5f9;border-radius:16px;padding:24px;margin-bottom:16px;">
+        <div id="qrSetupCode" style="display:flex;justify-content:center;margin:0 auto;background:#0d1117;border-radius:12px;padding:12px;width:244px;height:244px;align-items:center;"></div>
+        <div style="margin-top:12px;font-size:12px;color:#64748b;text-align:center;">Or enter room code manually:</div>
+        <div id="roomCodeDisplay" style="font-size:28px;font-weight:800;letter-spacing:6px;color:#1e293b;text-align:center;margin-top:8px;font-family:monospace;">------</div>
+        <div id="phoneUrlDisplay" style="margin-top:10px;font-size:10px;color:#94a3b8;text-align:center;word-break:break-all;"></div>
+        <div style="margin-top:10px;font-size:11px;color:#f59e0b;text-align:center;font-weight:600;">⚠️ Make sure phone and laptop are on same WiFi network</div>
+      </div>
+
+      <!-- Connection Status -->
+      <div id="qrSetupStatus" style="display:flex;align-items:center;justify-content:center;gap:8px;padding:12px;border-radius:12px;background:rgba(239,68,68,0.06);border:1px solid rgba(239,68,68,0.15);margin-bottom:16px;">
+        <span id="qrStatusDot" style="width:10px;height:10px;border-radius:50%;background:#ef4444;animation:pulse 2s infinite;"></span>
+        <span id="qrStatusText" style="font-size:13px;font-weight:600;color:#ef4444;">Waiting for phone connection...</span>
+      </div>
+
+      <!-- Buttons -->
+      <button class="btn-primary" id="qrContinueBtn" disabled style="opacity:0.5;cursor:not-allowed;width:100%;margin-bottom:8px;">Continue to Exam →</button>
+      <button class="btn-primary" id="qrSkipBtn" style="background:transparent;color:#94a3b8;border:1px solid rgba(148,163,184,0.3);width:100%;font-size:12px;">Skip — Continue without secondary camera</button>
+    </div>
+  </div>
+
   <!-- ── Disclaimer Modal ── -->
   <div class="disclaimer-overlay" id="disclaimerModal" style="display:none;">
     <div class="disclaimer-card">
@@ -48,24 +80,33 @@
 
         <h3 class="disclaimer-section-title">🔒 Proctoring Rules</h3>
         <ul class="disclaimer-rules">
-          <li><strong>Webcam & Microphone</strong> — Your camera and microphone will remain active throughout the exam for identity verification and audio monitoring.</li>
-          <li><strong>Fullscreen Mode</strong> — The exam will run in fullscreen. Exiting fullscreen will be flagged as suspicious activity.</li>
-          <li><strong>Eye Tracking</strong> — ARGUS tracks your gaze direction. Looking away from the screen for extended periods will be flagged.</li>
-          <li><strong>Tab Switching</strong> — Switching tabs or windows is prohibited and will be automatically detected.</li>
+          <li><strong>Webcam & Microphone</strong> — Your camera and microphone will remain active throughout the exam
+            for identity verification and audio monitoring.</li>
+          <li><strong>Fullscreen Mode</strong> — The exam will run in fullscreen. Exiting fullscreen will be flagged as
+            suspicious activity.</li>
+          <li><strong>Eye Tracking</strong> — ARGUS tracks your gaze direction. Looking away from the screen for
+            extended periods will be flagged.</li>
+          <li><strong>Tab Switching</strong> — Switching tabs or windows is prohibited and will be automatically
+            detected.</li>
           <li><strong>Copy/Paste Disabled</strong> — All clipboard operations are blocked during the exam.</li>
           <li><strong>Right-Click Disabled</strong> — Context menus are disabled throughout the exam.</li>
         </ul>
 
         <h3 class="disclaimer-section-title">🚨 How Flags Work</h3>
         <ul class="disclaimer-rules">
-          <li><strong>Face Mismatch</strong> — If a different face is detected, it will be flagged as a <span style="color:var(--danger);font-weight:700;">HIGH RISK</span> event.</li>
-          <li><strong>Audio Detection</strong> — Whispering, talking, or any suspicious audio above ambient noise levels will trigger a flag.</li>
-          <li><strong>Multiple Faces</strong> — If more than one face appears on camera, it will be flagged immediately.</li>
-          <li><strong>Suspicion Score</strong> — Each flag contributes to a suspicion score (0–100). Your session will be reviewed by an invigilator using AI analysis.</li>
+          <li><strong>Face Mismatch</strong> — If a different face is detected, it will be flagged as a <span
+              style="color:var(--danger);font-weight:700;">HIGH RISK</span> event.</li>
+          <li><strong>Audio Detection</strong> — Whispering, talking, or any suspicious audio above ambient noise levels
+            will trigger a flag.</li>
+          <li><strong>Multiple Faces</strong> — If more than one face appears on camera, it will be flagged immediately.
+          </li>
+          <li><strong>Suspicion Score</strong> — Each flag contributes to a suspicion score (0–100). Your session will
+            be reviewed by an invigilator using AI analysis.</li>
         </ul>
 
         <div class="disclaimer-warning">
-          ⚠️ All activity is recorded and will be reviewed. Any attempt to circumvent proctoring measures will result in automatic escalation.
+          ⚠️ All activity is recorded and will be reviewed. Any attempt to circumvent proctoring measures will result in
+          automatic escalation.
         </div>
       </div>
       <div class="disclaimer-footer">
@@ -97,9 +138,12 @@
       </div>
 
       <div class="face-align-hints" id="faceAlignHints" style="display:none;">
-        <div class="face-hint" id="hintHorizontal"><span class="hint-icon">↔</span> <span class="hint-text">Centered horizontally</span></div>
-        <div class="face-hint" id="hintVertical"><span class="hint-icon">↕</span> <span class="hint-text">Centered vertically</span></div>
-        <div class="face-hint" id="hintSize"><span class="hint-icon">📏</span> <span class="hint-text">Face size OK</span></div>
+        <div class="face-hint" id="hintHorizontal"><span class="hint-icon">↔</span> <span class="hint-text">Centered
+            horizontally</span></div>
+        <div class="face-hint" id="hintVertical"><span class="hint-icon">↕</span> <span class="hint-text">Centered
+            vertically</span></div>
+        <div class="face-hint" id="hintSize"><span class="hint-icon">📏</span> <span class="hint-text">Face size
+            OK</span></div>
       </div>
 
       <button class="btn-primary" id="faceAlignContinueBtn" disabled>Continue to Calibration</button>
@@ -134,7 +178,8 @@
     <div class="eye-tracking-indicator active" id="eyeTrackingIndicator" title="Eye tracking active">
       <span class="eye-tracking-icon">👁</span>
     </div>
-    <div class="eye-tracking-indicator active" id="audioIndicator" title="Audio monitoring active" style="right:60px;left:auto;background:rgba(16,185,129,0.15);border-color:rgba(16,185,129,0.3);">
+    <div class="eye-tracking-indicator active" id="audioIndicator" title="Audio monitoring active"
+      style="right:60px;left:auto;background:rgba(16,185,129,0.15);border-color:rgba(16,185,129,0.3);">
       <span class="eye-tracking-icon">🎙</span>
     </div>
     <!-- Top Bar -->
@@ -149,6 +194,10 @@
           <span class="timer-label">Time Remaining</span>
           <span class="timer-value" id="timerValue">00 : 30 : 00</span>
         </div>
+        <div class="proctoring-badge" id="secondaryCamBadge" style="background:rgba(148,163,184,0.1);border-color:rgba(148,163,184,0.2);display:none;">
+          <span class="proctoring-dot" id="secondaryCamBadgeDot" style="background:#94a3b8;"></span>
+          <span id="secondaryCamBadgeText">📱 Not Connected</span>
+        </div>
         <div class="proctoring-badge">
           <span class="proctoring-dot"></span>
           Proctoring On
@@ -162,9 +211,12 @@
       <aside class="exam-sidebar">
         <div class="sidebar-card">
           <div class="sidebar-card-title">Exam Information</div>
-          <div class="exam-meta-row"><span class="meta-label">Date</span><span class="meta-value" id="examDate">April 3, 2026</span></div>
-          <div class="exam-meta-row"><span class="meta-label">Duration</span><span class="meta-value">30 Minutes</span></div>
-          <div class="exam-meta-row"><span class="meta-label">Subject</span><span class="meta-value">Artificial Intelligence</span></div>
+          <div class="exam-meta-row"><span class="meta-label">Date</span><span class="meta-value" id="examDate">April 3,
+              2026</span></div>
+          <div class="exam-meta-row"><span class="meta-label">Duration</span><span class="meta-value">30 Minutes</span>
+          </div>
+          <div class="exam-meta-row"><span class="meta-label">Subject</span><span class="meta-value">Artificial
+              Intelligence</span></div>
         </div>
 
         <div class="sidebar-card">
@@ -180,7 +232,9 @@
 
         <div class="sidebar-card">
           <div class="sidebar-card-title">Exam Progress</div>
-          <div class="progress-bar-container"><div class="progress-bar-fill" id="progressBarFill"></div></div>
+          <div class="progress-bar-container">
+            <div class="progress-bar-fill" id="progressBarFill"></div>
+          </div>
           <div class="progress-text" id="progressText">0 of 10 answered</div>
           <div class="review-text" id="reviewText">0 Marked for Review</div>
         </div>
@@ -188,8 +242,6 @@
         <div class="suspicion-badge" id="suspicionBadge">
           ⚠ Flags: <strong id="flagCount">0</strong>
         </div>
-
-        <button class="btn-end-exam" id="endExamTrigger">Submit Exam</button>
       </aside>
 
       <!-- Main Content -->
@@ -198,12 +250,54 @@
       </main>
     </div>
 
+    <!-- Submit Exam Button — fixed bottom center -->
+    <button class="btn-end-exam" id="endExamTrigger">Submit Exam</button>
+
     <!-- Webcam -->
     <div class="webcam-container" id="webcamContainer">
       <div class="rec-dot"></div>
       <div class="rec-label">REC</div>
       <video id="webcamVideo" autoplay muted playsinline></video>
     </div>
+
+    <!-- Secondary Camera QR + Status -->
+    <div id="secondaryCamPanel" style="position:fixed;bottom:12px;left:12px;z-index:900;display:none;">
+      <!-- QR Code (shown until phone connects) -->
+      <div id="secondaryCamQR"
+        style="background:#fff;border:1px solid rgba(0,0,0,0.1);border-radius:14px;padding:12px;width:180px;text-align:center;box-shadow:0 4px 20px rgba(0,0,0,0.08);">
+        <div style="font-size:11px;font-weight:700;color:#1e293b;margin-bottom:6px;letter-spacing:0.5px;">📱 SCAN WITH
+          PHONE</div>
+        <div id="qrCanvas" style="display:flex;justify-content:center;margin:0 auto;width:140px;height:140px;align-items:center;"></div>
+        <div style="font-size:9px;color:#94a3b8;margin-top:6px;">Place phone facing keyboard</div>
+      </div>
+      <!-- Status indicator (shown after QR scanned) -->
+      <div id="secondaryCamStatus"
+        style="display:none;background:#fff;border:1px solid rgba(0,0,0,0.1);border-radius:14px;padding:10px 14px;width:200px;box-shadow:0 4px 20px rgba(0,0,0,0.08);">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+          <span id="secCamDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;"></span>
+          <span style="font-size:11px;font-weight:700;color:#1e293b;" id="secCamLabel">📱 Phone Connected</span>
+        </div>
+        <div style="font-size:10px;color:#94a3b8;" id="secCamSnapCount">Snapshots: 0</div>
+        <!-- AI Detection Status -->
+        <div id="secCamAIStatus"
+          style="display:none;margin-top:6px;padding:6px 10px;border-radius:8px;background:rgba(34,197,94,0.08);border:1px solid rgba(34,197,94,0.2);">
+          <div style="font-size:10px;font-weight:700;color:#22c55e;display:flex;align-items:center;gap:4px;">
+            <span style="width:6px;height:6px;border-radius:50%;background:#22c55e;display:inline-block;"></span>
+            <span id="secCamAILabel">🧠 AI Detection Active</span>
+          </div>
+        </div>
+        <!-- Object Detection Alert -->
+        <div id="secCamObjectAlert"
+          style="display:none;margin-top:6px;padding:6px 10px;border-radius:8px;background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.25);">
+          <div style="font-size:10px;font-weight:700;color:#ef4444;" id="secCamObjectLabel">🚨 Objects Detected</div>
+          <div style="font-size:9px;color:#94a3b8;margin-top:2px;" id="secCamObjectList"></div>
+        </div>
+        <div id="secCamPreview" style="margin-top:6px;border-radius:8px;overflow:hidden;display:none;">
+          <img id="secCamPreviewImg" style="width:100%;display:block;" alt="Secondary cam">
+        </div>
+      </div>
+    </div>
+
     <canvas id="snapshotCanvas" style="display:none;"></canvas>
   </div>
 
@@ -219,7 +313,8 @@
       </div>
       <div style="display:flex;gap:10px;margin-top:8px;">
         <button class="btn-primary" id="endExamBtn" style="background:var(--danger);">Submit & End</button>
-        <button class="btn-primary" id="cancelEndBtn" style="background:var(--bg-primary);border:1px solid var(--border);color:var(--text-secondary);">Cancel</button>
+        <button class="btn-primary" id="cancelEndBtn"
+          style="background:var(--bg-primary);border:1px solid var(--border);color:var(--text-secondary);">Cancel</button>
       </div>
     </div>
   </div>
@@ -229,7 +324,8 @@
     <div class="warning-card">
       <div class="warning-icon">🚨</div>
       <div class="warning-title">Suspicious Activity Detected</div>
-      <div class="warning-text" id="warningText">ARGUS has detected suspicious activity. This incident has been logged and will be reviewed.</div>
+      <div class="warning-text" id="warningText">ARGUS has detected suspicious activity. This incident has been logged
+        and will be reviewed.</div>
       <button class="warning-dismiss" id="warningDismiss">I Understand</button>
     </div>
   </div>
@@ -240,139 +336,140 @@
       <div class="warning-icon">🖥</div>
       <div class="warning-title" style="color: var(--warning);">Fullscreen Required</div>
       <div class="warning-text">Fullscreen is required during the exam</div>
-      <button class="warning-dismiss" id="fullscreenReturnBtn" style="background: var(--accent);">Return to Exam</button>
+      <button class="warning-dismiss" id="fullscreenReturnBtn" style="background: var(--accent);">Return to
+        Exam</button>
     </div>
   </div>
 
 
 
-<script>
-// ══════════════════════════════════════════
-// ARGUS — Student Proctoring Client
-// ══════════════════════════════════════════
+  <script>
+    // ══════════════════════════════════════════
+    // ARGUS — Student Proctoring Client
+    // ══════════════════════════════════════════
 
 
 
-const EXAM_DURATION = 30 * 60;
-const SNAPSHOT_INTERVAL = 30000; // 30 seconds
+    const EXAM_DURATION = 30 * 60;
+    const SNAPSHOT_INTERVAL = 30000; // 30 seconds
 
-// ── Question Bank ──
-const questions = [
-  {
-    type: 'essay',
-    text: 'Explain the concept of artificial intelligence and its impact on modern society. Discuss at least three real-world applications and their ethical implications.'
-  },
-  {
-    type: 'mcq',
-    text: 'Which of the following is a supervised learning algorithm?',
-    options: ['K-Means Clustering', 'Linear Regression', 'DBSCAN', 'Principal Component Analysis'],
-    correct: 1
-  },
-  {
-    type: 'true_false',
-    text: 'Deep learning is a subset of machine learning that uses neural networks with multiple layers.',
-    correct: true
-  },
-  {
-    type: 'mcq',
-    text: 'What does GPU stand for in the context of AI computing?',
-    options: ['General Purpose Unit', 'Graphics Processing Unit', 'Global Processing Utility', 'Gradient Propagation Unit'],
-    correct: 1
-  },
-  {
-    type: 'short_answer',
-    text: 'Name two common activation functions used in neural networks.'
-  },
-  {
-    type: 'essay',
-    text: 'Describe the differences between supervised and unsupervised machine learning. Provide examples of when each approach would be most appropriate.'
-  },
-  {
-    type: 'true_false',
-    text: 'Overfitting occurs when a model performs well on training data but poorly on unseen data.',
-    correct: true
-  },
-  {
-    type: 'mcq',
-    text: 'Which technique is used to prevent overfitting in neural networks?',
-    options: ['Dropout', 'Gradient Ascent', 'Data Duplication', 'Increasing Learning Rate'],
-    correct: 0
-  },
-  {
-    type: 'short_answer',
-    text: 'What is the purpose of a loss function in machine learning?'
-  },
-  {
-    type: 'true_false',
-    text: 'Natural Language Processing (NLP) is exclusively used for translating languages.',
-    correct: false
-  }
-];
+    // ── Question Bank ──
+    const questions = [
+      {
+        type: 'essay',
+        text: 'Explain the concept of artificial intelligence and its impact on modern society. Discuss at least three real-world applications and their ethical implications.'
+      },
+      {
+        type: 'mcq',
+        text: 'Which of the following is a supervised learning algorithm?',
+        options: ['K-Means Clustering', 'Linear Regression', 'DBSCAN', 'Principal Component Analysis'],
+        correct: 1
+      },
+      {
+        type: 'true_false',
+        text: 'Deep learning is a subset of machine learning that uses neural networks with multiple layers.',
+        correct: true
+      },
+      {
+        type: 'mcq',
+        text: 'What does GPU stand for in the context of AI computing?',
+        options: ['General Purpose Unit', 'Graphics Processing Unit', 'Global Processing Utility', 'Gradient Propagation Unit'],
+        correct: 1
+      },
+      {
+        type: 'short_answer',
+        text: 'Name two common activation functions used in neural networks.'
+      },
+      {
+        type: 'essay',
+        text: 'Describe the differences between supervised and unsupervised machine learning. Provide examples of when each approach would be most appropriate.'
+      },
+      {
+        type: 'true_false',
+        text: 'Overfitting occurs when a model performs well on training data but poorly on unseen data.',
+        correct: true
+      },
+      {
+        type: 'mcq',
+        text: 'Which technique is used to prevent overfitting in neural networks?',
+        options: ['Dropout', 'Gradient Ascent', 'Data Duplication', 'Increasing Learning Rate'],
+        correct: 0
+      },
+      {
+        type: 'short_answer',
+        text: 'What is the purpose of a loss function in machine learning?'
+      },
+      {
+        type: 'true_false',
+        text: 'Natural Language Processing (NLP) is exclusively used for translating languages.',
+        correct: false
+      }
+    ];
 
-let flags = [];
-let flagCount = 0;
-let timerSeconds = EXAM_DURATION;
-let timerInterval = null;
-let snapshotInterval = null;
-let examStartTime = null;
-let studentName = '';
-let examCode = '';
-let warningQueue = [];
-let showingWarning = false;
-let faceDetectionInterval = null;
-let headTurnInterval = null;
-let headTurnTimer = null;
-let snapshots = [];
-let webcamStream = null;
-let proctoringAttached = false;
-let examActive = false;
-let fullscreenModalOpen = false;
-let fullscreenGracePeriod = false;
-let eyeTrackingFlagCount = 0;
-let eyeTrackingSuspicionBonus = 0;
-let lookAwayTimer = null;
-let isLookingAway = false;
-let eyeTrackingInterval = null;
-let eyeFlagCooldown = false;
-let verticalTurnTimer = null;
-let verticalCooldown = false;
-let calibratedPoints = 0;
+    let flags = [];
+    let flagCount = 0;
+    let timerSeconds = EXAM_DURATION;
+    let timerInterval = null;
+    let snapshotInterval = null;
+    let examStartTime = null;
+    let studentName = '';
+    let examCode = '';
+    let warningQueue = [];
+    let showingWarning = false;
+    let faceDetectionInterval = null;
+    let headTurnInterval = null;
+    let headTurnTimer = null;
+    let snapshots = [];
+    let webcamStream = null;
+    let proctoringAttached = false;
+    let examActive = false;
+    let fullscreenModalOpen = false;
+    let fullscreenGracePeriod = false;
+    let eyeTrackingFlagCount = 0;
+    let eyeTrackingSuspicionBonus = 0;
+    let lookAwayTimer = null;
+    let isLookingAway = false;
+    let eyeTrackingInterval = null;
+    let eyeFlagCooldown = false;
+    let verticalTurnTimer = null;
+    let verticalCooldown = false;
+    let calibratedPoints = 0;
 
-const calibrationClicks = {};
-const LOOK_AWAY_THRESHOLD_MS = 1000;
-let nullDataCount = 0;
+    const calibrationClicks = {};
+    const LOOK_AWAY_THRESHOLD_MS = 1000;
+    let nullDataCount = 0;
 
-// ── Question Navigation ──
-let currentQuestionIndex = 0;
-let questionAnswers = [];
-let questionMarkedForReview = [];
+    // ── Question Navigation ──
+    let currentQuestionIndex = 0;
+    let questionAnswers = [];
+    let questionMarkedForReview = [];
 
-// ── Face Mismatch Detection ──
-let referenceFaceDescriptor = null;
-let faceMismatchCooldown = false;
-let faceMismatchInterval = null;
+    // ── Face Mismatch Detection ──
+    let referenceFaceDescriptor = null;
+    let faceMismatchCooldown = false;
+    let faceMismatchInterval = null;
 
-// ── Audio Detection ──
-let audioContext = null;
-let audioAnalyser = null;
-let audioDataArray = null;
-let audioStream = null;
-let audioMonitorInterval = null;
-let audioSpikeTimer = null;
-let audioCooldown = false;
-let audioThreshold = 25; // default, will be calibrated
-let audioFlagCount = 0;
-let ambientNoiseLevel = 0;
+    // ── Audio Detection ──
+    let audioContext = null;
+    let audioAnalyser = null;
+    let audioDataArray = null;
+    let audioStream = null;
+    let audioMonitorInterval = null;
+    let audioSpikeTimer = null;
+    let audioCooldown = false;
+    let audioThreshold = 25; // default, will be calibrated
+    let audioFlagCount = 0;
+    let ambientNoiseLevel = 0;
 
-// ── Instant Warning Popup (non-blocking red overlay) ──
-function showWarningPopup(message) {
-  // Remove any existing popup first
-  const existing = document.getElementById('argusInstantWarning');
-  if (existing) existing.remove();
+    // ── Instant Warning Popup (non-blocking red overlay) ──
+    function showWarningPopup(message) {
+      // Remove any existing popup first
+      const existing = document.getElementById('argusInstantWarning');
+      if (existing) existing.remove();
 
-  const popup = document.createElement('div');
-  popup.id = 'argusInstantWarning';
-  popup.style.cssText = `
+      const popup = document.createElement('div');
+      popup.id = 'argusInstantWarning';
+      popup.style.cssText = `
     position: fixed;
     top: 0; left: 0; right: 0;
     z-index: 999999;
@@ -387,13 +484,13 @@ function showWarningPopup(message) {
     pointer-events: none;
     animation: argusSlideDown 0.3s ease-out;
   `;
-  popup.textContent = '⚠️ ' + message;
+      popup.textContent = '⚠️ ' + message;
 
-  // Add animation keyframes if not already present
-  if (!document.getElementById('argusPopupStyles')) {
-    const style = document.createElement('style');
-    style.id = 'argusPopupStyles';
-    style.textContent = `
+      // Add animation keyframes if not already present
+      if (!document.getElementById('argusPopupStyles')) {
+        const style = document.createElement('style');
+        style.id = 'argusPopupStyles';
+        style.textContent = `
       @keyframes argusSlideDown {
         from { transform: translateY(-100%); opacity: 0; }
         to   { transform: translateY(0);     opacity: 1; }
@@ -403,1327 +500,1354 @@ function showWarningPopup(message) {
         to   { transform: translateY(-100%); opacity: 0; }
       }
     `;
-    document.head.appendChild(style);
-  }
-
-  document.body.appendChild(popup);
-
-  // Auto-dismiss after 2 seconds
-  setTimeout(() => {
-    popup.style.animation = 'argusSlideUp 0.3s ease-in forwards';
-    setTimeout(() => popup.remove(), 300);
-  }, 2000);
-
-  console.log('[ARGUS] ⚠️ Instant warning popup shown:', message);
-}
-
-// ── Elements ──
-const landingScreen = document.getElementById('landingScreen');
-const calibrationScreen = document.getElementById('calibrationScreen');
-const calibrationProgress = document.getElementById('calibrationProgress');
-const calibrationDots = Array.from(document.querySelectorAll('.calibration-dot'));
-const examScreen = document.getElementById('examScreen');
-const startExamBtn = document.getElementById('startExamBtn');
-const eyeTrackingIndicator = document.getElementById('eyeTrackingIndicator');
-const timerDisplay = document.getElementById('timerDisplay');
-const timerValueEl = document.getElementById('timerValue');
-const flagCountEl = document.getElementById('flagCount');
-const suspicionBadge = document.getElementById('suspicionBadge');
-const warningOverlay = document.getElementById('warningOverlay');
-const warningText = document.getElementById('warningText');
-const warningDismiss = document.getElementById('warningDismiss');
-const fullscreenModal = document.getElementById('fullscreenModal');
-const fullscreenReturnBtn = document.getElementById('fullscreenReturnBtn');
-const webcamVideo = document.getElementById('webcamVideo');
-const examContent = document.getElementById('examContent');
-const snapshotCanvas = document.getElementById('snapshotCanvas');
-const questionGridEl = document.getElementById('questionGrid');
-const progressBarFill = document.getElementById('progressBarFill');
-const progressText = document.getElementById('progressText');
-const reviewText = document.getElementById('reviewText');
-
-// ── Render Questions (Single Question View) ──
-function renderQuestions() {
-  // Initialize state arrays
-  questionAnswers = questions.map(() => null);
-  questionMarkedForReview = questions.map(() => false);
-  currentQuestionIndex = 0;
-
-  // Render question grid in sidebar
-  renderQuestionGrid();
-
-  // Render first question
-  renderCurrentQuestion();
-
-  // Wire up end exam modal
-  document.getElementById('endExamTrigger').addEventListener('click', () => {
-    document.getElementById('endExamModal').style.display = 'flex';
-  });
-
-  document.getElementById('cancelEndBtn').addEventListener('click', () => {
-    document.getElementById('endExamModal').style.display = 'none';
-  });
-
-  document.getElementById('endExamBtn').addEventListener('click', () => {
-    const pw = document.getElementById('endPassword').value;
-    if (pw !== 'argus123') {
-      alert('Incorrect password. You cannot end the exam without the correct password.');
-      return;
-    }
-    document.getElementById('endExamModal').style.display = 'none';
-    endExam();
-  });
-}
-
-function renderCurrentQuestion() {
-  saveCurrentAnswer();
-  const i = currentQuestionIndex;
-  const q = questions[i];
-  const total = questions.length;
-  const isReview = questionMarkedForReview[i];
-
-  let html = '<div class="exam-question-card">';
-
-  // Header
-  html += '<div class="question-header">';
-  html += '<div class="question-number">Question ' + (i + 1) + ' of ' + total + ' <span class="q-type-badge q-type-' + q.type + '">' + formatType(q.type) + '</span></div>';
-  html += '<button class="btn-mark-review ' + (isReview ? 'marked' : '') + '" id="btnMarkReview" onclick="toggleReview()">' + (isReview ? '🚩 Marked' : '🏳 Mark for Review') + '</button>';
-  html += '</div>';
-
-  // Category
-  html += '<div class="question-category">Artificial Intelligence</div>';
-
-  // Question text
-  html += '<div class="question-text">' + q.text + '</div>';
-
-  // Answer area
-  const saved = questionAnswers[i];
-  if (q.type === 'essay') {
-    html += '<textarea class="answer-area" placeholder="Type your detailed answer here..." data-q="' + i + '" id="answerField">' + (saved || '') + '</textarea>';
-  } else if (q.type === 'short_answer') {
-    html += '<input type="text" class="answer-input" placeholder="Type your answer here..." data-q="' + i + '" id="answerField" value="' + (saved || '') + '">';
-  } else if (q.type === 'mcq') {
-    html += '<div class="mcq-options">';
-    q.options.forEach((opt, oi) => {
-      html += '<label class="mcq-option"><input type="radio" name="q' + i + '" value="' + oi + '" data-q="' + i + '" ' + (saved == oi ? 'checked' : '') + '><span class="mcq-letter">' + String.fromCharCode(65 + oi) + '</span><span class="mcq-text">' + opt + '</span></label>';
-    });
-    html += '</div>';
-  } else if (q.type === 'true_false') {
-    html += '<div class="tf-options">';
-    html += '<label class="tf-option"><input type="radio" name="q' + i + '" value="true" data-q="' + i + '" ' + (saved === 'true' ? 'checked' : '') + '><span class="tf-btn tf-true">✓ True</span></label>';
-    html += '<label class="tf-option"><input type="radio" name="q' + i + '" value="false" data-q="' + i + '" ' + (saved === 'false' ? 'checked' : '') + '><span class="tf-btn tf-false">✗ False</span></label>';
-    html += '</div>';
-  }
-
-  // Footer nav
-  html += '<div class="question-footer">';
-  html += '<button class="btn-q-nav btn-q-prev" onclick="prevQuestion()" ' + (i === 0 ? 'disabled' : '') + '>← Previous</button>';
-  html += '<button class="btn-q-clear" onclick="clearResponse()">Clear Response</button>';
-  if (i < total - 1) {
-    html += '<button class="btn-q-nav btn-q-next" onclick="saveAndNext()">Save & Next →</button>';
-  } else {
-    html += '<button class="btn-q-nav btn-q-next" onclick="saveAndNext()" style="background:var(--success);">Finish →</button>';
-  }
-  html += '</div>';
-
-  html += '</div>';
-  examContent.innerHTML = html;
-  updateQuestionGrid();
-  updateProgress();
-}
-
-function saveCurrentAnswer() {
-  if (currentQuestionIndex < 0) return;
-  const q = questions[currentQuestionIndex];
-  const i = currentQuestionIndex;
-  if (q.type === 'essay') {
-    const el = document.querySelector('#answerField');
-    if (el) questionAnswers[i] = el.value || null;
-  } else if (q.type === 'short_answer') {
-    const el = document.querySelector('#answerField');
-    if (el) questionAnswers[i] = el.value || null;
-  } else if (q.type === 'mcq' || q.type === 'true_false') {
-    const checked = document.querySelector('input[name="q' + i + '"]:checked');
-    questionAnswers[i] = checked ? checked.value : null;
-  }
-}
-
-function navigateToQuestion(index) {
-  saveCurrentAnswer();
-  currentQuestionIndex = index;
-  renderCurrentQuestion();
-}
-
-function nextQuestion() {
-  if (currentQuestionIndex < questions.length - 1) {
-    navigateToQuestion(currentQuestionIndex + 1);
-  }
-}
-
-function prevQuestion() {
-  if (currentQuestionIndex > 0) {
-    navigateToQuestion(currentQuestionIndex - 1);
-  }
-}
-
-function saveAndNext() {
-  saveCurrentAnswer();
-  if (currentQuestionIndex < questions.length - 1) {
-    navigateToQuestion(currentQuestionIndex + 1);
-  } else {
-    renderCurrentQuestion(); // refresh to show updated state
-  }
-}
-
-function clearResponse() {
-  questionAnswers[currentQuestionIndex] = null;
-  renderCurrentQuestion();
-}
-
-function toggleReview() {
-  questionMarkedForReview[currentQuestionIndex] = !questionMarkedForReview[currentQuestionIndex];
-  renderCurrentQuestion();
-}
-
-function renderQuestionGrid() {
-  let html = '';
-  questions.forEach((q, i) => {
-    html += '<button class="q-grid-btn" data-qi="' + i + '" onclick="navigateToQuestion(' + i + ')">' + (i + 1) + '</button>';
-  });
-  questionGridEl.innerHTML = html;
-}
-
-function updateQuestionGrid() {
-  const btns = questionGridEl.querySelectorAll('.q-grid-btn');
-  btns.forEach((btn, i) => {
-    btn.className = 'q-grid-btn';
-    if (i === currentQuestionIndex) {
-      btn.classList.add('q-current');
-    } else if (questionMarkedForReview[i]) {
-      btn.classList.add('q-review');
-    } else if (questionAnswers[i] !== null) {
-      btn.classList.add('q-answered');
-    }
-  });
-}
-
-function updateProgress() {
-  const answered = questionAnswers.filter(a => a !== null).length;
-  const total = questions.length;
-  const reviewCount = questionMarkedForReview.filter(r => r).length;
-  progressBarFill.style.width = (answered / total * 100) + '%';
-  progressText.textContent = answered + ' of ' + total + ' answered';
-  reviewText.textContent = reviewCount + ' Marked for Review';
-}
-
-function formatType(type) {
-  const map = { essay: 'Essay', mcq: 'Multiple Choice', true_false: 'True / False', short_answer: 'Short Answer' };
-  return map[type] || type;
-}
-
-function updateCalibrationProgress() {
-  calibrationProgress.textContent = `Calibrated: ${calibratedPoints}/9 points`;
-}
-
-function resetCalibration() {
-  calibratedPoints = 0;
-  calibrationDots.forEach(dot => {
-    const pointId = dot.dataset.point;
-    calibrationClicks[pointId] = 0;
-    dot.disabled = false;
-    dot.classList.remove('completed');
-  });
-  updateCalibrationProgress();
-}
-
-async function completeCalibrationAndStartExam() {
-  calibrationScreen.style.display = 'none';
-
-  // Run accuracy check
-  console.log('[ARGUS] Checking calibration accuracy...');
-  await webgazer.begin();
-
-  var predictionSamples = [];
-  await new Promise(function(resolve) {
-    var accuracyCheck = setInterval(async function() {
-      try {
-        var p = await webgazer.getCurrentPrediction();
-        if (p) predictionSamples.push(p);
-      } catch (e) {}
-
-      if (predictionSamples.length >= 10) {
-        clearInterval(accuracyCheck);
-        resolve();
+        document.head.appendChild(style);
       }
-    }, 500);
 
-    // Force resolve after 8 seconds
-    setTimeout(function() {
-      clearInterval(accuracyCheck);
-      resolve();
-    }, 8000);
-  });
+      document.body.appendChild(popup);
 
-  // Stop webgazer temporarily (startEyeTracking will restart it)
-  try { webgazer.end(); } catch (e) {}
+      // Auto-dismiss after 2 seconds
+      setTimeout(() => {
+        popup.style.animation = 'argusSlideUp 0.3s ease-in forwards';
+        setTimeout(() => popup.remove(), 300);
+      }, 2000);
 
-  if (predictionSamples.length >= 5) {
-    var xValues = predictionSamples.map(function(p) { return p.x; });
-    var xRange = Math.max.apply(null, xValues) - Math.min.apply(null, xValues);
-    console.log('[ARGUS] Prediction x-range:', xRange, 'samples:', predictionSamples.length);
-
-    if (xRange < 50 || xRange > 1500) {
-      console.log('[ARGUS] Calibration quality marginal (range:', xRange, '), proceeding anyway');
+      console.log('[ARGUS] ⚠️ Instant warning popup shown:', message);
     }
-  } else {
-    console.log('[ARGUS] Not enough samples, proceeding anyway');
-  }
 
-  console.log('[ARGUS] Proceeding to exam');
-  startExam();
-  startEyeTracking();
-}
+    // ── Elements ──
+    const landingScreen = document.getElementById('landingScreen');
+    const calibrationScreen = document.getElementById('calibrationScreen');
+    const calibrationProgress = document.getElementById('calibrationProgress');
+    const calibrationDots = Array.from(document.querySelectorAll('.calibration-dot'));
+    const examScreen = document.getElementById('examScreen');
+    const startExamBtn = document.getElementById('startExamBtn');
+    const eyeTrackingIndicator = document.getElementById('eyeTrackingIndicator');
+    const timerDisplay = document.getElementById('timerDisplay');
+    const timerValueEl = document.getElementById('timerValue');
+    const flagCountEl = document.getElementById('flagCount');
+    const suspicionBadge = document.getElementById('suspicionBadge');
+    const warningOverlay = document.getElementById('warningOverlay');
+    const warningText = document.getElementById('warningText');
+    const warningDismiss = document.getElementById('warningDismiss');
+    const fullscreenModal = document.getElementById('fullscreenModal');
+    const fullscreenReturnBtn = document.getElementById('fullscreenReturnBtn');
+    const webcamVideo = document.getElementById('webcamVideo');
+    const examContent = document.getElementById('examContent');
+    const snapshotCanvas = document.getElementById('snapshotCanvas');
+    const questionGridEl = document.getElementById('questionGrid');
+    const progressBarFill = document.getElementById('progressBarFill');
+    const progressText = document.getElementById('progressText');
+    const reviewText = document.getElementById('reviewText');
 
-function startCalibrationFlow() {
-  resetCalibration();
-  landingScreen.style.display = 'none';
-  calibrationScreen.style.display = 'flex';
-}
+    // ── Render Questions (Single Question View) ──
+    function renderQuestions() {
+      // Initialize state arrays
+      questionAnswers = questions.map(() => null);
+      questionMarkedForReview = questions.map(() => false);
+      currentQuestionIndex = 0;
 
-calibrationDots.forEach(dot => {
-  dot.addEventListener('click', () => {
-    const pointId = dot.dataset.point;
-    calibrationClicks[pointId] = (calibrationClicks[pointId] || 0) + 1;
-    if (calibrationClicks[pointId] >= 5 && !dot.classList.contains('completed')) {
-      dot.classList.add('completed');
-      dot.disabled = true;
-      calibratedPoints++;
+      // Render question grid in sidebar
+      renderQuestionGrid();
+
+      // Render first question
+      renderCurrentQuestion();
+
+      // Wire up end exam modal
+      document.getElementById('endExamTrigger').addEventListener('click', () => {
+        document.getElementById('endExamModal').style.display = 'flex';
+      });
+
+      document.getElementById('cancelEndBtn').addEventListener('click', () => {
+        document.getElementById('endExamModal').style.display = 'none';
+      });
+
+      document.getElementById('endExamBtn').addEventListener('click', () => {
+        const pw = document.getElementById('endPassword').value;
+        if (pw !== 'argus123') {
+          alert('Incorrect password. You cannot end the exam without the correct password.');
+          return;
+        }
+        document.getElementById('endExamModal').style.display = 'none';
+        endExam();
+      });
+    }
+
+    function renderCurrentQuestion() {
+      saveCurrentAnswer();
+      const i = currentQuestionIndex;
+      const q = questions[i];
+      const total = questions.length;
+      const isReview = questionMarkedForReview[i];
+
+      let html = '<div class="exam-question-card">';
+
+      // Header
+      html += '<div class="question-header">';
+      html += '<div class="question-number">Question ' + (i + 1) + ' of ' + total + ' <span class="q-type-badge q-type-' + q.type + '">' + formatType(q.type) + '</span></div>';
+      html += '<button class="btn-mark-review ' + (isReview ? 'marked' : '') + '" id="btnMarkReview" onclick="toggleReview()">' + (isReview ? '🚩 Marked' : '🏳 Mark for Review') + '</button>';
+      html += '</div>';
+
+      // Category
+      html += '<div class="question-category">Artificial Intelligence</div>';
+
+      // Question text
+      html += '<div class="question-text">' + q.text + '</div>';
+
+      // Answer area
+      const saved = questionAnswers[i];
+      if (q.type === 'essay') {
+        html += '<textarea class="answer-area" placeholder="Type your detailed answer here..." data-q="' + i + '" id="answerField">' + (saved || '') + '</textarea>';
+      } else if (q.type === 'short_answer') {
+        html += '<input type="text" class="answer-input" placeholder="Type your answer here..." data-q="' + i + '" id="answerField" value="' + (saved || '') + '">';
+      } else if (q.type === 'mcq') {
+        html += '<div class="mcq-options">';
+        q.options.forEach((opt, oi) => {
+          html += '<label class="mcq-option"><input type="radio" name="q' + i + '" value="' + oi + '" data-q="' + i + '" ' + (saved == oi ? 'checked' : '') + '><span class="mcq-letter">' + String.fromCharCode(65 + oi) + '</span><span class="mcq-text">' + opt + '</span></label>';
+        });
+        html += '</div>';
+      } else if (q.type === 'true_false') {
+        html += '<div class="tf-options">';
+        html += '<label class="tf-option"><input type="radio" name="q' + i + '" value="true" data-q="' + i + '" ' + (saved === 'true' ? 'checked' : '') + '><span class="tf-btn tf-true">✓ True</span></label>';
+        html += '<label class="tf-option"><input type="radio" name="q' + i + '" value="false" data-q="' + i + '" ' + (saved === 'false' ? 'checked' : '') + '><span class="tf-btn tf-false">✗ False</span></label>';
+        html += '</div>';
+      }
+
+      // Footer nav
+      html += '<div class="question-footer">';
+      html += '<button class="btn-q-nav btn-q-prev" onclick="prevQuestion()" ' + (i === 0 ? 'disabled' : '') + '>← Previous</button>';
+      html += '<button class="btn-q-clear" onclick="clearResponse()">Clear Response</button>';
+      if (i < total - 1) {
+        html += '<button class="btn-q-nav btn-q-next" onclick="saveAndNext()">Save & Next →</button>';
+      } else {
+        html += '<button class="btn-q-nav btn-q-next" onclick="saveAndNext()" style="background:var(--success);">Finish →</button>';
+      }
+      html += '</div>';
+
+      html += '</div>';
+      examContent.innerHTML = html;
+      updateQuestionGrid();
+      updateProgress();
+    }
+
+    function saveCurrentAnswer() {
+      if (currentQuestionIndex < 0) return;
+      const q = questions[currentQuestionIndex];
+      const i = currentQuestionIndex;
+      if (q.type === 'essay') {
+        const el = document.querySelector('#answerField');
+        if (el) questionAnswers[i] = el.value || null;
+      } else if (q.type === 'short_answer') {
+        const el = document.querySelector('#answerField');
+        if (el) questionAnswers[i] = el.value || null;
+      } else if (q.type === 'mcq' || q.type === 'true_false') {
+        const checked = document.querySelector('input[name="q' + i + '"]:checked');
+        questionAnswers[i] = checked ? checked.value : null;
+      }
+    }
+
+    function navigateToQuestion(index) {
+      saveCurrentAnswer();
+      currentQuestionIndex = index;
+      renderCurrentQuestion();
+    }
+
+    function nextQuestion() {
+      if (currentQuestionIndex < questions.length - 1) {
+        navigateToQuestion(currentQuestionIndex + 1);
+      }
+    }
+
+    function prevQuestion() {
+      if (currentQuestionIndex > 0) {
+        navigateToQuestion(currentQuestionIndex - 1);
+      }
+    }
+
+    function saveAndNext() {
+      saveCurrentAnswer();
+      if (currentQuestionIndex < questions.length - 1) {
+        navigateToQuestion(currentQuestionIndex + 1);
+      } else {
+        renderCurrentQuestion(); // refresh to show updated state
+      }
+    }
+
+    function clearResponse() {
+      questionAnswers[currentQuestionIndex] = null;
+      renderCurrentQuestion();
+    }
+
+    function toggleReview() {
+      questionMarkedForReview[currentQuestionIndex] = !questionMarkedForReview[currentQuestionIndex];
+      renderCurrentQuestion();
+    }
+
+    function renderQuestionGrid() {
+      let html = '';
+      questions.forEach((q, i) => {
+        html += '<button class="q-grid-btn" data-qi="' + i + '" onclick="navigateToQuestion(' + i + ')">' + (i + 1) + '</button>';
+      });
+      questionGridEl.innerHTML = html;
+    }
+
+    function updateQuestionGrid() {
+      const btns = questionGridEl.querySelectorAll('.q-grid-btn');
+      btns.forEach((btn, i) => {
+        btn.className = 'q-grid-btn';
+        if (i === currentQuestionIndex) {
+          btn.classList.add('q-current');
+        } else if (questionMarkedForReview[i]) {
+          btn.classList.add('q-review');
+        } else if (questionAnswers[i] !== null) {
+          btn.classList.add('q-answered');
+        }
+      });
+    }
+
+    function updateProgress() {
+      const answered = questionAnswers.filter(a => a !== null).length;
+      const total = questions.length;
+      const reviewCount = questionMarkedForReview.filter(r => r).length;
+      progressBarFill.style.width = (answered / total * 100) + '%';
+      progressText.textContent = answered + ' of ' + total + ' answered';
+      reviewText.textContent = reviewCount + ' Marked for Review';
+    }
+
+    function formatType(type) {
+      const map = { essay: 'Essay', mcq: 'Multiple Choice', true_false: 'True / False', short_answer: 'Short Answer' };
+      return map[type] || type;
+    }
+
+    function updateCalibrationProgress() {
+      calibrationProgress.textContent = `Calibrated: ${calibratedPoints}/9 points`;
+    }
+
+    function resetCalibration() {
+      calibratedPoints = 0;
+      calibrationDots.forEach(dot => {
+        const pointId = dot.dataset.point;
+        calibrationClicks[pointId] = 0;
+        dot.disabled = false;
+        dot.classList.remove('completed');
+      });
       updateCalibrationProgress();
-      if (calibratedPoints === 9) {
-        setTimeout(() => {
-          completeCalibrationAndStartExam();
-        }, 350);
-      }
     }
-  });
-});
 
-function updateEyeTrackingIndicator(away) {
-  eyeTrackingIndicator.classList.toggle('away', away);
-  eyeTrackingIndicator.classList.toggle('active', !away);
-}
+    async function completeCalibrationAndStartExam() {
+      calibrationScreen.style.display = 'none';
 
-function resetLookingAwayTimer() {
-  if (lookAwayTimer) {
-    clearTimeout(lookAwayTimer);
-    lookAwayTimer = null;
-  }
-  if (isLookingAway) {
-    isLookingAway = false;
-    updateEyeTrackingIndicator(false);
-  }
-}
+      // Run accuracy check
+      console.log('[ARGUS] Checking calibration accuracy...');
+      await webgazer.begin();
 
-function handleLookingAway(detail) {
-  if (isLookingAway) return;
-  if (eyeFlagCooldown) {
-    console.log('[ARGUS] ⏳ Flag cooldown active, skipping');
-    return;
-  }
-  isLookingAway = true;
-  eyeFlagCooldown = true;
-  updateEyeTrackingIndicator(true);
-  console.log('LOOKING AWAY DETECTED');
-  console.log('Calling flag function now');
-  console.log('[ARGUS] 🚨 FLAG: eye_movement — ' + detail);
-  addFlag('eye_movement', detail);
-  showWarning('ARGUS detected you looking away from screen');
-  eyeTrackingFlagCount++;
-  localStorage.setItem('eyeTrackingFlags', String(eyeTrackingFlagCount));
-  if (eyeTrackingFlagCount % 3 === 0) {
-    eyeTrackingSuspicionBonus += 15;
-    localStorage.setItem('argus_eye_suspicion_bonus', String(eyeTrackingSuspicionBonus));
-  }
-  // 5 second cooldown before next flag
-  setTimeout(function() {
-    eyeFlagCooldown = false;
-    console.log('[ARGUS] Flag cooldown ended');
-  }, 5000);
-}
+      var predictionSamples = [];
+      await new Promise(function (resolve) {
+        var accuracyCheck = setInterval(async function () {
+          try {
+            var p = await webgazer.getCurrentPrediction();
+            if (p) predictionSamples.push(p);
+          } catch (e) { }
 
-async function startEyeTracking() {
-  if (typeof webgazer === 'undefined') {
-    console.warn('[ARGUS] ❌ webgazer.js not loaded');
-    return;
-  }
+          if (predictionSamples.length >= 10) {
+            clearInterval(accuracyCheck);
+            resolve();
+          }
+        }, 500);
 
-  // ── STEP 1: Start WebGazer ──
-  await webgazer.begin();
-  console.log('[ARGUS] ✅ WebGazer ready — begin() completed');
-  console.log('[ARGUS] All webgazer methods:', Object.keys(webgazer));
+        // Force resolve after 8 seconds
+        setTimeout(function () {
+          clearInterval(accuracyCheck);
+          resolve();
+        }, 8000);
+      });
 
-  // ── STEP 2: Show prediction dot ──
-  webgazer.showPredictionPoints(true);
-  console.log('[ARGUS] 🔴 Prediction dot enabled');
+      // Stop webgazer temporarily (startEyeTracking will restart it)
+      try { webgazer.end(); } catch (e) { }
 
-  // ── STEP 3: Hide WebGazer video overlay ──
-  var videoContainer = document.getElementById('webgazerVideoContainer');
-  var faceOverlay = document.getElementById('webgazerFaceOverlay');
-  var faceFeedback = document.getElementById('webgazerFaceFeedbackBox');
-  if (videoContainer) videoContainer.style.display = 'none';
-  if (faceOverlay) faceOverlay.style.display = 'none';
-  if (faceFeedback) faceFeedback.style.display = 'none';
+      if (predictionSamples.length >= 5) {
+        var xValues = predictionSamples.map(function (p) { return p.x; });
+        var xRange = Math.max.apply(null, xValues) - Math.min.apply(null, xValues);
+        console.log('[ARGUS] Prediction x-range:', xRange, 'samples:', predictionSamples.length);
 
-  // ── STEP 4: Wait for WebGazer to be prediction-ready ──
-  console.log('[ARGUS] Waiting for WebGazer to be prediction-ready...');
-  await new Promise(function(resolve) {
-    var resolved = false;
-    var checkReady = setInterval(async function() {
-      if (resolved) return;
-      try {
-        var test = await webgazer.getCurrentPrediction();
-        console.log('[ARGUS] ✅ WebGazer prediction ready! Test:', test);
-        clearInterval(checkReady);
-        resolved = true;
-        resolve();
-      } catch (e) {
-        console.log('[ARGUS] ⏳ Not ready yet:', e.message);
-      }
-    }, 500);
-
-    // Force start after 5 seconds regardless
-    setTimeout(function() {
-      if (!resolved) {
-        clearInterval(checkReady);
-        resolved = true;
-        console.log('[ARGUS] ⚠️ Force starting after 5s timeout');
-        resolve();
-      }
-    }, 5000);
-  });
-
-  // ── STEP 5: Poll gaze via getCurrentPrediction every 200ms ──
-  console.log('[ARGUS] Starting gaze polling');
-
-  eyeTrackingInterval = setInterval(function() {
-    if (!examActive) return;
-
-    webgazer.getCurrentPrediction().then(function(prediction) {
-      if (!prediction) {
-        nullDataCount++;
-        console.log('[ARGUS] Prediction: null — face not detected (count: ' + nullDataCount + ')');
-        if (nullDataCount > 15) {
-          handleLookingAway('Student looked away from screen');
+        if (xRange < 50 || xRange > 1500) {
+          console.log('[ARGUS] Calibration quality marginal (range:', xRange, '), proceeding anyway');
         }
-        if (!lookAwayTimer) {
-          lookAwayTimer = setTimeout(function() {
-            console.log('[ARGUS] FLAGGING: looking away (face lost for 1s)');
-            handleLookingAway('Student looked away from screen');
-            lookAwayTimer = null;
-          }, LOOK_AWAY_THRESHOLD_MS);
-        }
-        return;
+      } else {
+        console.log('[ARGUS] Not enough samples, proceeding anyway');
       }
 
-      // Get actual viewport dimensions
-      var screenW = Math.max(document.documentElement.clientWidth, window.innerWidth || 0);
-      var screenH = Math.max(document.documentElement.clientHeight, window.innerHeight || 0);
+      console.log('[ARGUS] Proceeding to exam');
+      startExam();
+      startEyeTracking();
+    }
 
-      // Boundary padding: 150px left/top, 250px right, 300px bottom (WebGazer underestimates down gaze)
-      var isOutside =
-        prediction.x < 150 ||
-        prediction.x > screenW - 250 ||
-        prediction.y < 150 ||
-        prediction.y > screenH - 300;
+    function startCalibrationFlow() {
+      resetCalibration();
+      landingScreen.style.display = 'none';
+      calibrationScreen.style.display = 'flex';
+    }
 
-      console.log('[ARGUS] Gaze:', Math.round(prediction.x), Math.round(prediction.y),
-        'Screen:', screenW, screenH, 'Outside:', isOutside,
-        'y threshold:', screenH - 300);
-
-      // ── OUTSIDE SCREEN BOUNDS ──
-      if (isOutside) {
-        if (!lookAwayTimer) {
-          lookAwayTimer = setTimeout(function() {
-            console.log('[ARGUS] FLAGGING: gaze outside screen bounds');
-            handleLookingAway('Student gaze detected outside screen bounds');
-            lookAwayTimer = null;
-          }, LOOK_AWAY_THRESHOLD_MS);
+    calibrationDots.forEach(dot => {
+      dot.addEventListener('click', () => {
+        const pointId = dot.dataset.point;
+        calibrationClicks[pointId] = (calibrationClicks[pointId] || 0) + 1;
+        if (calibrationClicks[pointId] >= 5 && !dot.classList.contains('completed')) {
+          dot.classList.add('completed');
+          dot.disabled = true;
+          calibratedPoints++;
+          updateCalibrationProgress();
+          if (calibratedPoints === 9) {
+            setTimeout(() => {
+              completeCalibrationAndStartExam();
+            }, 350);
+          }
         }
-        return;
-      }
+      });
+    });
 
-      // ── ON SCREEN: reset everything ──
+    function updateEyeTrackingIndicator(away) {
+      eyeTrackingIndicator.classList.toggle('away', away);
+      eyeTrackingIndicator.classList.toggle('active', !away);
+    }
+
+    function resetLookingAwayTimer() {
       if (lookAwayTimer) {
         clearTimeout(lookAwayTimer);
         lookAwayTimer = null;
       }
-      nullDataCount = 0;
       if (isLookingAway) {
         isLookingAway = false;
         updateEyeTrackingIndicator(false);
       }
-    }).catch(function() {
-      // Silently ignore errors
-    });
-  }, 50);
+    }
 
-  updateEyeTrackingIndicator(false);
-  console.log('[ARGUS] ✅ Eye tracking fully active (polling mode).');
-}
-
-function stopEyeTracking() {
-  resetLookingAwayTimer();
-  updateEyeTrackingIndicator(false);
-  if (eyeTrackingInterval) {
-    clearInterval(eyeTrackingInterval);
-    eyeTrackingInterval = null;
-  }
-  if (typeof webgazer !== 'undefined' && typeof webgazer.end === 'function') {
-    try { webgazer.end(); } catch (_) {}
-  }
-}
-
-// ── Start Exam ──
-startExamBtn.addEventListener('click', async () => {
-  studentName = document.getElementById('studentName').value.trim();
-  examCode = document.getElementById('examCode').value.trim();
-  if (!studentName || !examCode) {
-    alert('Please enter your name and exam code.');
-    return;
-  }
-
-  const originalBtnText = startExamBtn.textContent;
-  startExamBtn.disabled = true;
-  startExamBtn.textContent = 'Requesting permissions...';
-
-  try {
-    await ensureCameraPermission();
-    // Show disclaimer instead of immediately starting
-    startExamBtn.disabled = false;
-    startExamBtn.textContent = originalBtnText;
-    document.getElementById('disclaimerModal').style.display = 'flex';
-  } catch (e) {
-    alert('Camera permission is required to start the exam.');
-    startExamBtn.disabled = false;
-    startExamBtn.textContent = originalBtnText;
-  }
-});
-
-// ── Disclaimer Handlers ──
-document.getElementById('disclaimerStartBtn').addEventListener('click', () => {
-  document.getElementById('disclaimerModal').style.display = 'none';
-
-  // Activate Electron kiosk/fullscreen mode NOW (after student agrees)
-  if (window.electronAPI && window.electronAPI.startExam) {
-    window.electronAPI.startExam();
-    console.log('[ARGUS] Electron kiosk mode activated via IPC');
-  }
-
-  // Store student info in localStorage
-  localStorage.setItem('argus_student', studentName);
-  localStorage.setItem('argus_exam_code', examCode);
-
-  // Proceed to face alignment → calibration → exam
-  startFaceAlignmentFlow();
-});
-
-document.getElementById('disclaimerExitBtn').addEventListener('click', () => {
-  document.getElementById('disclaimerModal').style.display = 'none';
-  // Go back to credentials screen — NO fullscreen, NO kiosk
-  landingScreen.style.display = 'flex';
-});
-
-// ══════════════════════════════════════════
-// FACE ALIGNMENT FLOW
-// ══════════════════════════════════════════
-let faceAlignInterval = null;
-let faceAlignModelsLoaded = false;
-let consecutiveCenteredFrames = 0;
-const REQUIRED_CENTERED_FRAMES = 10; // ~2 seconds of being centered
-
-async function startFaceAlignmentFlow() {
-  landingScreen.style.display = 'none';
-  const faceAlignScreen = document.getElementById('faceAlignScreen');
-  faceAlignScreen.style.display = 'flex';
-
-  const alignVideo = document.getElementById('alignVideo');
-  alignVideo.srcObject = webcamStream;
-
-  const statusIcon = document.getElementById('faceStatusIcon');
-  const statusText = document.getElementById('faceStatusText');
-  const hints = document.getElementById('faceAlignHints');
-  const continueBtn = document.getElementById('faceAlignContinueBtn');
-  const ovalGuide = document.getElementById('faceOvalGuide');
-
-  continueBtn.disabled = true;
-  consecutiveCenteredFrames = 0;
-  ovalGuide.className = 'face-oval-guide';
-
-  // Load face-api models if not already loaded
-  if (!faceAlignModelsLoaded) {
-    statusIcon.textContent = '⏳';
-    statusText.textContent = 'Loading face detection models...';
-    try {
-      if (typeof faceapi !== 'undefined') {
-        const MODEL_URL = 'https://justadudewhohacks.github.io/face-api.js/models';
-        await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
-        faceAlignModelsLoaded = true;
-        console.log('[ARGUS] Face alignment models loaded');
-      } else {
-        // face-api not loaded yet — wait for it
-        await new Promise((resolve, reject) => {
-          let attempts = 0;
-          const waitInterval = setInterval(() => {
-            attempts++;
-            if (typeof faceapi !== 'undefined') {
-              clearInterval(waitInterval);
-              resolve();
-            } else if (attempts > 20) {
-              clearInterval(waitInterval);
-              reject(new Error('face-api.js failed to load'));
-            }
-          }, 500);
-        });
-        const MODEL_URL = 'https://justadudewhohacks.github.io/face-api.js/models';
-        await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
-        faceAlignModelsLoaded = true;
+    function handleLookingAway(detail) {
+      if (isLookingAway) return;
+      if (eyeFlagCooldown) {
+        console.log('[ARGUS] ⏳ Flag cooldown active, skipping');
+        return;
       }
-    } catch (e) {
-      console.warn('[ARGUS] Face alignment model load failed:', e);
-      statusIcon.textContent = '⚠️';
-      statusText.textContent = 'Could not load face detection. You may continue anyway.';
-      continueBtn.disabled = false;
-      return;
-    }
-  }
-
-  statusIcon.textContent = '🔍';
-  statusText.textContent = 'Detecting your face...';
-  hints.style.display = 'flex';
-
-  // Start continuous face alignment checking
-  faceAlignInterval = setInterval(() => checkFaceAlignment(), 200);
-}
-
-async function checkFaceAlignment() {
-  const alignVideo = document.getElementById('alignVideo');
-  const statusIcon = document.getElementById('faceStatusIcon');
-  const statusText = document.getElementById('faceStatusText');
-  const continueBtn = document.getElementById('faceAlignContinueBtn');
-  const ovalGuide = document.getElementById('faceOvalGuide');
-  const hintH = document.getElementById('hintHorizontal');
-  const hintV = document.getElementById('hintVertical');
-  const hintS = document.getElementById('hintSize');
-
-  if (!alignVideo || alignVideo.videoWidth === 0) return;
-
-  try {
-    const detection = await faceapi.detectSingleFace(alignVideo, new faceapi.TinyFaceDetectorOptions());
-
-    if (!detection) {
-      statusIcon.textContent = '❌';
-      statusText.textContent = 'No face detected — make sure your face is visible';
-      ovalGuide.className = 'face-oval-guide error';
-      consecutiveCenteredFrames = 0;
-      continueBtn.disabled = true;
-      setHint(hintH, false, 'Face not found');
-      setHint(hintV, false, 'Face not found');
-      setHint(hintS, false, 'Face not found');
-      return;
-    }
-
-    const box = detection.box;
-    const videoW = alignVideo.videoWidth;
-    const videoH = alignVideo.videoHeight;
-
-    // Face center relative to video (0-1 range)
-    const faceCenterX = (box.x + box.width / 2) / videoW;
-    const faceCenterY = (box.y + box.height / 2) / videoH;
-    const faceWidthRatio = box.width / videoW;
-    const faceHeightRatio = box.height / videoH;
-
-    // Check centering (ideal: 0.5, tolerance: ±0.15)
-    const hCentered = Math.abs(faceCenterX - 0.5) < 0.15;
-    const vCentered = Math.abs(faceCenterY - 0.5) < 0.18;
-
-    // Check size (face should be ~20-55% of video width)
-    const sizeOk = faceWidthRatio > 0.18 && faceWidthRatio < 0.55;
-
-    // Determine direction hints
-    let hHint = 'Centered horizontally ✓';
-    if (!hCentered) {
-      hHint = faceCenterX < 0.5 ? 'Move right →' : '← Move left';
-    }
-
-    let vHint = 'Centered vertically ✓';
-    if (!vCentered) {
-      vHint = faceCenterY < 0.5 ? 'Move down ↓' : '↑ Move up';
-    }
-
-    let sHint = 'Face size OK ✓';
-    if (!sizeOk) {
-      sHint = faceWidthRatio < 0.18 ? 'Move closer to camera' : 'Move further from camera';
-    }
-
-    setHint(hintH, hCentered, hHint);
-    setHint(hintV, vCentered, vHint);
-    setHint(hintS, sizeOk, sHint);
-
-    const allGood = hCentered && vCentered && sizeOk;
-
-    if (allGood) {
-      consecutiveCenteredFrames++;
-      ovalGuide.className = 'face-oval-guide success';
-
-      if (consecutiveCenteredFrames >= REQUIRED_CENTERED_FRAMES) {
-        statusIcon.textContent = '✅';
-        statusText.textContent = 'Face aligned perfectly! You can continue.';
-        continueBtn.disabled = false;
-      } else {
-        statusIcon.textContent = '🟢';
-        statusText.textContent = 'Hold still... verifying alignment (' + Math.round((consecutiveCenteredFrames / REQUIRED_CENTERED_FRAMES) * 100) + '%)';
-        continueBtn.disabled = true;
+      isLookingAway = true;
+      eyeFlagCooldown = true;
+      updateEyeTrackingIndicator(true);
+      console.log('LOOKING AWAY DETECTED');
+      console.log('Calling flag function now');
+      console.log('[ARGUS] 🚨 FLAG: eye_movement — ' + detail);
+      addFlag('eye_movement', detail);
+      showWarning('ARGUS detected you looking away from screen');
+      eyeTrackingFlagCount++;
+      localStorage.setItem('eyeTrackingFlags', String(eyeTrackingFlagCount));
+      if (eyeTrackingFlagCount % 3 === 0) {
+        eyeTrackingSuspicionBonus += 15;
+        localStorage.setItem('argus_eye_suspicion_bonus', String(eyeTrackingSuspicionBonus));
       }
-    } else {
-      consecutiveCenteredFrames = 0;
-      ovalGuide.className = 'face-oval-guide warning';
-      statusIcon.textContent = '⚠️';
-      statusText.textContent = 'Adjust your position — follow the hints below';
-      continueBtn.disabled = true;
-    }
-  } catch (e) {
-    console.warn('[ARGUS] Face alignment check error:', e);
-  }
-}
-
-function setHint(el, ok, text) {
-  el.className = 'face-hint ' + (ok ? 'hint-ok' : 'hint-warn');
-  el.querySelector('.hint-text').textContent = text;
-}
-
-function stopFaceAlignment() {
-  if (faceAlignInterval) {
-    clearInterval(faceAlignInterval);
-    faceAlignInterval = null;
-  }
-}
-
-// Continue button → go to calibration
-document.getElementById('faceAlignContinueBtn').addEventListener('click', () => {
-  stopFaceAlignment();
-  document.getElementById('faceAlignScreen').style.display = 'none';
-  startCalibrationFlow();
-});
-
-
-
-async function startExam() {
-  if (!webcamStream) {
-    alert('Camera permission is required to start the exam.');
-    return;
-  }
-
-  // Reset per-session state
-  flags = [];
-  snapshots = [];
-  flagCount = 0;
-  timerSeconds = EXAM_DURATION;
-  warningQueue = [];
-  showingWarning = false;
-  eyeTrackingFlagCount = 0;
-  eyeTrackingSuspicionBonus = 0;
-  localStorage.setItem('eyeTrackingFlags', '0');
-  localStorage.setItem('argus_eye_suspicion_bonus', '0');
-
-  flagCountEl.textContent = '0';
-  suspicionBadge.className = 'suspicion-badge';
-
-  localStorage.setItem('argus_student', studentName);
-  localStorage.setItem('argus_examCode', examCode);
-  localStorage.setItem('argus_flags', '[]');
-  localStorage.setItem('argus_snapshots', '[]');
-  localStorage.setItem('argus_startTime', Date.now().toString());
-
-  renderQuestions();
-
-  // Set dynamic exam date
-  const dateEl = document.getElementById('examDate');
-  if (dateEl) {
-    const now = new Date();
-    dateEl.textContent = now.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
-  }
-
-  // Only transition to the exam screen after permission + credentials
-  landingScreen.style.display = 'none';
-  calibrationScreen.style.display = 'none';
-  document.getElementById('faceAlignScreen').style.display = 'none';
-  examScreen.style.display = 'block';
-
-  // Attach stream once we show the exam UI
-  webcamVideo.srcObject = webcamStream;
-
-  // Exam "start moment" happens here (timer/flags/timestamps rely on this)
-  examStartTime = Date.now();
-  examActive = true;
-
-
-
-  // Fullscreen should be activated after permission + credentials
-  enterFullscreen();
-
-  // Proctoring and timers must start ONLY here
-  attachProctoring();
-  startTimer();
-  startSnapshots();
-
-  // Face detection models MUST load before capturing reference face
-  await initFaceDetection();
-  captureReferenceFace();
-
-  // Start audio monitoring
-  if (audioStream) {
-    setupAudioMonitoring();
-  }
-}
-
-// ── Fullscreen ──
-function enterFullscreen() {
-  // Set grace period to suppress false tab_switch flags during fullscreen transition
-  fullscreenGracePeriod = true;
-  setTimeout(() => { fullscreenGracePeriod = false; }, 2000);
-  console.log('[ARGUS] Fullscreen grace period started (2s)');
-  const el = document.documentElement;
-  (el.requestFullscreen || el.webkitRequestFullscreen || el.msRequestFullscreen || function(){}).call(el);
-}
-
-// ── Webcam ──
-async function ensureCameraPermission() {
-  if (webcamStream) return webcamStream;
-  try {
-    const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
-    webcamStream = stream;
-
-    // Also request microphone for audio monitoring
-    try {
-      audioStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-      console.log('[ARGUS] 🎙 Microphone permission granted');
-    } catch (micErr) {
-      console.warn('[ARGUS] Microphone access denied (audio monitoring disabled):', micErr.message);
+      // 5 second cooldown before next flag
+      setTimeout(function () {
+        eyeFlagCooldown = false;
+        console.log('[ARGUS] Flag cooldown ended');
+      }, 5000);
     }
 
-    return webcamStream;
-  } catch (e) {
-    console.warn('Webcam access denied:', e);
-    throw e;
-  }
-}
+    async function startEyeTracking() {
+      if (typeof webgazer === 'undefined') {
+        console.warn('[ARGUS] ❌ webgazer.js not loaded');
+        return;
+      }
 
-// ── Snapshots ──
-function startSnapshots() {
-  captureSnapshot('exam_start');
-  snapshotInterval = setInterval(() => captureSnapshot('periodic'), SNAPSHOT_INTERVAL);
-}
+      // ── STEP 1: Start WebGazer ──
+      await webgazer.begin();
+      console.log('[ARGUS] ✅ WebGazer ready — begin() completed');
+      console.log('[ARGUS] All webgazer methods:', Object.keys(webgazer));
 
-function captureSnapshot(reason) {
-  if (!webcamVideo.srcObject || webcamVideo.videoWidth === 0) return;
-  snapshotCanvas.width = 320;
-  snapshotCanvas.height = 240;
-  const ctx = snapshotCanvas.getContext('2d');
-  ctx.drawImage(webcamVideo, 0, 0, 320, 240);
-  const dataUrl = snapshotCanvas.toDataURL('image/jpeg', 0.6);
-  const elapsedSecs = Math.round((Date.now() - examStartTime) / 1000);
-  const entry = {
-    timestamp: new Date().toISOString(),
-    elapsed: elapsedSecs,
-    reason: reason,
-    image: dataUrl
-  };
-  snapshots.push(entry);
-  // Keep max 40 to avoid localStorage limits
-  if (snapshots.length > 40) snapshots.shift();
-  localStorage.setItem('argus_snapshots', JSON.stringify(snapshots));
+      // ── STEP 2: Show prediction dot ──
+      webgazer.showPredictionPoints(true);
+      console.log('[ARGUS] 🔴 Prediction dot enabled');
 
+      // ── STEP 3: Hide WebGazer video overlay ──
+      var videoContainer = document.getElementById('webgazerVideoContainer');
+      var faceOverlay = document.getElementById('webgazerFaceOverlay');
+      var faceFeedback = document.getElementById('webgazerFaceFeedbackBox');
+      if (videoContainer) videoContainer.style.display = 'none';
+      if (faceOverlay) faceOverlay.style.display = 'none';
+      if (faceFeedback) faceFeedback.style.display = 'none';
 
-}
-
-// ── Timer ──
-function startTimer() {
-  updateTimerDisplay();
-  timerInterval = setInterval(() => {
-    timerSeconds--;
-    updateTimerDisplay();
-    if (timerSeconds <= 0) {
-      clearInterval(timerInterval);
-      endExam();
-    }
-  }, 1000);
-}
-
-function updateTimerDisplay() {
-  const h = Math.floor(timerSeconds / 3600).toString().padStart(2, '0');
-  const m = Math.floor((timerSeconds % 3600) / 60).toString().padStart(2, '0');
-  const s = (timerSeconds % 60).toString().padStart(2, '0');
-  if (timerValueEl) {
-    timerValueEl.textContent = h + ' : ' + m + ' : ' + s;
-  }
-}
-
-// ── Flagging ──
-function addFlag(type, detail) {
-  console.log('FLAG FUNCTION CALLED', type, detail);
-  const elapsedSecs = Math.round((Date.now() - examStartTime) / 1000);
-  const entry = {
-    type, detail,
-    timestamp: new Date().toISOString(),
-    elapsedSeconds: elapsedSecs
-  };
-  flags.push(entry);
-  flagCount++;
-  flagCountEl.textContent = flagCount;
-
-  if (flagCount >= 5) suspicionBadge.className = 'suspicion-badge danger';
-  else if (flagCount >= 2) suspicionBadge.className = 'suspicion-badge warning';
-
-  localStorage.setItem('argus_flags', JSON.stringify(flags));
-
-
-
-  // Capture snapshot on flag
-  captureSnapshot('flag_' + type);
-
-  showWarning(detail);
-}
-
-function showWarning(text) {
-  warningQueue.push(text);
-  if (!showingWarning) displayNextWarning();
-}
-
-function displayNextWarning() {
-  if (warningQueue.length === 0) { showingWarning = false; return; }
-  showingWarning = true;
-  warningText.textContent = 'ARGUS has detected suspicious activity: ' + warningQueue.shift();
-  warningOverlay.style.display = 'flex';
-}
-
-warningDismiss.addEventListener('click', () => {
-  warningOverlay.style.display = 'none';
-  displayNextWarning();
-});
-
-function showFullscreenRequiredModal() {
-  if (!examActive) return;
-  if (fullscreenModalOpen) return;
-  fullscreenModalOpen = true;
-  fullscreenModal.style.display = 'flex';
-}
-
-function hideFullscreenRequiredModal() {
-  fullscreenModalOpen = false;
-  fullscreenModal.style.display = 'none';
-}
-
-fullscreenReturnBtn.addEventListener('click', () => {
-  // Browser fullscreen requires a user gesture → only request fullscreen here.
-  enterFullscreen();
-  hideFullscreenRequiredModal();
-});
-
-
-
-// ── Proctoring Listeners ──
-function attachProctoring() {
-  if (proctoringAttached) return;
-  proctoringAttached = true;
-
-  document.addEventListener('visibilitychange', () => {
-    if (!examActive) return;
-    if (document.hidden && !fullscreenGracePeriod) {
-      addFlag('tab_switch', 'Student switched to another tab');
-    } else if (document.hidden && fullscreenGracePeriod) {
-      console.log('[ARGUS] Suppressed false tab_switch during fullscreen transition');
-    }
-  });
-
-  function onFullscreenChange() {
-    if (!examActive) return;
-    if (!document.fullscreenElement) {
-      addFlag('fullscreen_exit', 'Student exited fullscreen mode');
-      showFullscreenRequiredModal();
-    }
-  }
-
-  document.addEventListener('fullscreenchange', onFullscreenChange);
-  document.addEventListener('webkitfullscreenchange', onFullscreenChange);
-
-  document.addEventListener('copy', (e) => {
-    e.preventDefault();
-    addFlag('copy_attempt', 'Student attempted to copy content (Ctrl+C)');
-  });
-
-  document.addEventListener('paste', (e) => {
-    e.preventDefault();
-    addFlag('paste_attempt', 'Student attempted to paste content (Ctrl+V)');
-  }, true);
-
-  document.addEventListener('keydown', (e) => {
-    const key = (e.key || '').toLowerCase();
-
-    // ESC handling: can't always prevent leaving fullscreen, but we always flag + warn.
-    if (key === 'escape') {
-      try { e.preventDefault(); } catch (_) {}
-      addFlag('escape_attempt', 'Student pressed ESC (attempted to exit fullscreen)');
-      showFullscreenRequiredModal();
-      return;
-    }
-
-    const isModifier = e.ctrlKey || e.metaKey;
-    if (!isModifier) return;
-
-    // Block common shortcuts
-    if (key === 'c') {
-      e.preventDefault();
-      addFlag('copy_attempt', 'Student attempted to copy content (Ctrl+C)');
-    } else if (key === 'v') {
-      e.preventDefault();
-      addFlag('paste_attempt', 'Student attempted to paste content (Ctrl+V)');
-    } else if (key === 'a') {
-      e.preventDefault();
-      addFlag('select_all_attempt', 'Student attempted to select all content (Ctrl+A)');
-    } else if (key === 'u') {
-      e.preventDefault();
-      addFlag('view_source_attempt', 'Student attempted to view source (Ctrl+U)');
-    }
-  }, true);
-
-  document.addEventListener('contextmenu', (e) => {
-    e.preventDefault();
-    addFlag('right_click', 'Student attempted to right-click');
-  });
-}
-
-// ── Face Detection ──
-async function initFaceDetection() {
-  if (typeof faceapi === 'undefined') { console.warn('face-api.js not loaded'); return; }
-  try {
-    const MODEL_URL = 'https://justadudewhohacks.github.io/face-api.js/models';
-    await Promise.all([
-      faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
-      faceapi.nets.faceLandmark68TinyNet.loadFromUri(MODEL_URL),
-      faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL)
-    ]);
-    console.log('[ARGUS] All face-api models loaded');
-
-    // Existing face count check every 8s
-    faceDetectionInterval = setInterval(async () => {
-      if (!webcamVideo.srcObject) return;
-      try {
-        const detections = await faceapi.detectAllFaces(webcamVideo, new faceapi.TinyFaceDetectorOptions());
-        if (detections.length === 0) addFlag('no_face', 'Student looked away from screen');
-        else if (detections.length > 1) addFlag('multiple_faces', `Multiple faces detected (${detections.length} faces)`);
-      } catch(e) {}
-    }, 8000);
-
-    // Head turn detection every 200ms
-    headTurnInterval = setInterval(async () => {
-      if (!examActive) return;
-      await checkHeadPose();
-    }, 200);
-  } catch (e) { console.warn('Face detection init failed:', e); }
-}
-
-async function checkHeadPose() {
-  try {
-    // Guard: don't run if models not loaded
-    if (!faceapi.nets.tinyFaceDetector.isLoaded) {
-      console.log('[ARGUS] Models not ready yet');
-      return;
-    }
-
-    const video = document.querySelector('video[id*="webcam"], #webcamVideo, video');
-    if (!video) return;
-
-    const detection = await faceapi.detectSingleFace(video, new faceapi.TinyFaceDetectorOptions()).withFaceLandmarks(true);
-    if (!detection) return;
-
-    const landmarks = detection.landmarks;
-    const nose = landmarks.getNose();
-    const jaw = landmarks.getJawOutline();
-
-    // Get nose tip (index 3)
-    const noseTip = nose[3];
-
-    // Get jaw left and right points
-    const jawLeft = jaw[0];
-    const jawRight = jaw[jaw.length - 1];
-
-    // Calculate face center x
-    const faceCenterX = (jawLeft.x + jawRight.x) / 2;
-
-    // Face width
-    const faceWidth = jawRight.x - jawLeft.x;
-
-    // How far nose is from center relative to face width
-    const noseOffset = Math.abs(noseTip.x - faceCenterX);
-    const ratio = noseOffset / faceWidth;
-
-    console.log('[ARGUS] Nose offset ratio:', ratio.toFixed(2));
-
-    // If nose is more than 20% off center = head turned
-    if (ratio > 0.20) {
-      console.log('[ARGUS] HEAD TURN DETECTED:', ratio.toFixed(2));
-
-      if (!headTurnTimer) {
-        headTurnTimer = setTimeout(() => {
-          if (!eyeFlagCooldown) {
-            eyeFlagCooldown = true;
-            addFlag('head_turn', 'Student turned head away from screen');
-            setTimeout(() => {
-              eyeFlagCooldown = false;
-            }, 5000);
+      // ── STEP 4: Wait for WebGazer to be prediction-ready ──
+      console.log('[ARGUS] Waiting for WebGazer to be prediction-ready...');
+      await new Promise(function (resolve) {
+        var resolved = false;
+        var checkReady = setInterval(async function () {
+          if (resolved) return;
+          try {
+            var test = await webgazer.getCurrentPrediction();
+            console.log('[ARGUS] ✅ WebGazer prediction ready! Test:', test);
+            clearInterval(checkReady);
+            resolved = true;
+            resolve();
+          } catch (e) {
+            console.log('[ARGUS] ⏳ Not ready yet:', e.message);
           }
-          headTurnTimer = null;
-        }, 400);
-      }
-    } else {
-      if (headTurnTimer) {
-        clearTimeout(headTurnTimer);
-        headTurnTimer = null;
-      }
-    }
+        }, 500);
 
-    // ── Vertical gaze detection (looking down / up) ──
-    // Get face bounding box
-    const box = detection.detection.box;
+        // Force start after 5 seconds regardless
+        setTimeout(function () {
+          if (!resolved) {
+            clearInterval(checkReady);
+            resolved = true;
+            console.log('[ARGUS] ⚠️ Force starting after 5s timeout');
+            resolve();
+          }
+        }, 5000);
+      });
 
-    // Get nose tip y position
-    const noseTipY = nose[3];
+      // ── STEP 5: Poll gaze via getCurrentPrediction every 200ms ──
+      console.log('[ARGUS] Starting gaze polling');
 
-    // Face height
-    const faceHeight = box.height;
-
-    // How far nose is from top of face box
-    const noseVerticalRatio = (noseTipY.y - box.y) / faceHeight;
-
-    console.log('[ARGUS] Nose vertical ratio:', noseVerticalRatio.toFixed(2));
-
-    // Normal looking forward = ~0.40-0.55
-    // Looking down = ratio increases > 0.57
-    // Looking up = ratio decreases < 0.35 (was 0.45 — too sensitive)
-    if (noseVerticalRatio > 0.57) {
-      console.log('[ARGUS] LOOKING DOWN DETECTED:', noseVerticalRatio.toFixed(2));
-
-      // Show warning popup IMMEDIATELY (but only if not in cooldown)
-      if (!verticalCooldown) {
-        showWarningPopup('ARGUS detected suspicious eye movement — looking down');
-      }
-
-      // Then start timer for flag storage (separate from popup)
-      if (!verticalTurnTimer && !verticalCooldown) {
-        verticalTurnTimer = setTimeout(() => {
-          verticalCooldown = true;
-          addFlag('head_turn', 'Student looked down - possibly cheating from phone');
-          setTimeout(() => {
-            verticalCooldown = false;
-          }, 2000);
-          verticalTurnTimer = null;
-        }, 400);
-      }
-    } else if (noseVerticalRatio < 0.35) {
-      console.log('[ARGUS] LOOKING UP DETECTED:', noseVerticalRatio.toFixed(2));
-
-      // Show warning popup IMMEDIATELY (but only if not in cooldown)
-      if (!verticalCooldown) {
-        showWarningPopup('ARGUS detected suspicious eye movement — looking up');
-      }
-
-      // Then start timer for flag storage (separate from popup)
-      if (!verticalTurnTimer && !verticalCooldown) {
-        verticalTurnTimer = setTimeout(() => {
-          verticalCooldown = true;
-          addFlag('head_turn', 'Student looked up from screen');
-          setTimeout(() => {
-            verticalCooldown = false;
-          }, 2000);
-          verticalTurnTimer = null;
-        }, 300);
-      }
-    } else {
-      // Gaze returned to normal — cancel pending vertical timer
-      if (verticalTurnTimer) {
-        clearTimeout(verticalTurnTimer);
-        verticalTurnTimer = null;
-      }
-    }
-  } catch (e) {
-    // silently ignore
-  }
-}
-
-// ── Face Mismatch Detection ──
-let referenceFaceCaptureAttempts = 0;
-
-async function captureReferenceFace() {
-  referenceFaceCaptureAttempts++;
-  console.log('[ARGUS] captureReferenceFace attempt #' + referenceFaceCaptureAttempts);
-
-  try {
-    console.log('[ARGUS] Waiting 2s before capturing reference face...');
-    await new Promise(r => setTimeout(r, 2000));
-
-    // Wait for face recognition model to load
-    if (typeof faceapi === 'undefined') {
-      console.warn('[ARGUS] face-api.js not available, retrying in 3s...');
-      if (referenceFaceCaptureAttempts < 20) setTimeout(captureReferenceFace, 3000);
-      return;
-    }
-
-    if (!faceapi.nets.faceRecognitionNet.isLoaded) {
-      console.log('[ARGUS] Face recognition model not loaded yet, retrying in 3s...');
-      if (referenceFaceCaptureAttempts < 20) setTimeout(captureReferenceFace, 3000);
-      return;
-    }
-
-    const video = document.querySelector('#webcamVideo, video');
-    if (!video || video.videoWidth === 0) {
-      console.log('[ARGUS] Video not ready, retrying in 2s...');
-      if (referenceFaceCaptureAttempts < 20) setTimeout(captureReferenceFace, 2000);
-      return;
-    }
-
-    console.log('[ARGUS] Running face detection on video...');
-    const detection = await faceapi
-      .detectSingleFace(video, new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.3 }))
-      .withFaceLandmarks(true)
-      .withFaceDescriptor();
-
-    console.log('[ARGUS] Detection result:', detection ? 'FACE FOUND' : 'NO FACE');
-
-    if (detection) {
-      referenceFaceDescriptor = detection.descriptor;
-      console.log('[ARGUS] ✅ Reference face descriptor captured, length:', referenceFaceDescriptor.length);
-
-      // Store reference snapshot
-      try {
-        const canvas = document.createElement('canvas');
-        canvas.width = 320;
-        canvas.height = 240;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(video, 0, 0, 320, 240);
-        const refSnapshot = canvas.toDataURL('image/jpeg', 0.7);
-        localStorage.setItem('argus_reference_snapshot', refSnapshot);
-        console.log('[ARGUS] Reference face snapshot stored in localStorage');
-      } catch (snapErr) {
-        console.warn('[ARGUS] Could not store reference snapshot:', snapErr);
-      }
-
-      // Show confirmation toast
-      showWarningPopup('Identity verified ✅ — Reference face captured');
-
-      // Start periodic face match checks every 15 seconds
-      console.log('[ARGUS] Starting face mismatch checks every 15s');
-      faceMismatchInterval = setInterval(() => {
+      eyeTrackingInterval = setInterval(function () {
         if (!examActive) return;
-        checkFaceMatch();
-      }, 15000);
 
-      // Also run first check after 10 seconds
-      setTimeout(() => {
-        if (examActive) checkFaceMatch();
-      }, 10000);
-    } else {
-      console.log('[ARGUS] Could not detect face for reference, retrying in 2s...');
-      if (referenceFaceCaptureAttempts < 20) setTimeout(captureReferenceFace, 2000);
+        webgazer.getCurrentPrediction().then(function (prediction) {
+          if (!prediction) {
+            nullDataCount++;
+            console.log('[ARGUS] Prediction: null — face not detected (count: ' + nullDataCount + ')');
+            if (nullDataCount > 15) {
+              handleLookingAway('Student looked away from screen');
+            }
+            if (!lookAwayTimer) {
+              lookAwayTimer = setTimeout(function () {
+                console.log('[ARGUS] FLAGGING: looking away (face lost for 1s)');
+                handleLookingAway('Student looked away from screen');
+                lookAwayTimer = null;
+              }, LOOK_AWAY_THRESHOLD_MS);
+            }
+            return;
+          }
+
+          // Get actual viewport dimensions
+          var screenW = Math.max(document.documentElement.clientWidth, window.innerWidth || 0);
+          var screenH = Math.max(document.documentElement.clientHeight, window.innerHeight || 0);
+
+          // Boundary padding: 150px left/top, 250px right, 300px bottom (WebGazer underestimates down gaze)
+          var isOutside =
+            prediction.x < 150 ||
+            prediction.x > screenW - 250 ||
+            prediction.y < 150 ||
+            prediction.y > screenH - 300;
+
+          console.log('[ARGUS] Gaze:', Math.round(prediction.x), Math.round(prediction.y),
+            'Screen:', screenW, screenH, 'Outside:', isOutside,
+            'y threshold:', screenH - 300);
+
+          // ── OUTSIDE SCREEN BOUNDS ──
+          if (isOutside) {
+            if (!lookAwayTimer) {
+              lookAwayTimer = setTimeout(function () {
+                console.log('[ARGUS] FLAGGING: gaze outside screen bounds');
+                handleLookingAway('Student gaze detected outside screen bounds');
+                lookAwayTimer = null;
+              }, LOOK_AWAY_THRESHOLD_MS);
+            }
+            return;
+          }
+
+          // ── ON SCREEN: reset everything ──
+          if (lookAwayTimer) {
+            clearTimeout(lookAwayTimer);
+            lookAwayTimer = null;
+          }
+          nullDataCount = 0;
+          if (isLookingAway) {
+            isLookingAway = false;
+            updateEyeTrackingIndicator(false);
+          }
+        }).catch(function () {
+          // Silently ignore errors
+        });
+      }, 50);
+
+      updateEyeTrackingIndicator(false);
+      console.log('[ARGUS] ✅ Eye tracking fully active (polling mode).');
     }
-  } catch (e) {
-    console.warn('[ARGUS] Face capture error:', e.message || e);
-    if (referenceFaceCaptureAttempts < 20) setTimeout(captureReferenceFace, 3000);
-  }
-}
 
-async function checkFaceMatch() {
-  console.log('[ARGUS] checkFaceMatch() called');
-  try {
-    if (!referenceFaceDescriptor) {
-      console.log('[ARGUS] No reference face descriptor, skipping check');
-      return;
-    }
-    if (typeof faceapi === 'undefined' || !faceapi.nets.faceRecognitionNet.isLoaded) {
-      console.log('[ARGUS] Face recognition model not loaded, skipping check');
-      return;
+    function stopEyeTracking() {
+      resetLookingAwayTimer();
+      updateEyeTrackingIndicator(false);
+      if (eyeTrackingInterval) {
+        clearInterval(eyeTrackingInterval);
+        eyeTrackingInterval = null;
+      }
+      if (typeof webgazer !== 'undefined' && typeof webgazer.end === 'function') {
+        try { webgazer.end(); } catch (_) { }
+      }
     }
 
-    const video = document.querySelector('#webcamVideo, video');
-    if (!video || video.videoWidth === 0) {
-      console.log('[ARGUS] Video not available for face check');
-      return;
+    // ── Start Exam ──
+    startExamBtn.addEventListener('click', async () => {
+      studentName = document.getElementById('studentName').value.trim();
+      examCode = document.getElementById('examCode').value.trim();
+      if (!studentName || !examCode) {
+        alert('Please enter your name and exam code.');
+        return;
+      }
+
+      const originalBtnText = startExamBtn.textContent;
+      startExamBtn.disabled = true;
+      startExamBtn.textContent = 'Requesting permissions...';
+
+      try {
+        await ensureCameraPermission();
+        startExamBtn.disabled = false;
+        startExamBtn.textContent = originalBtnText;
+
+        // Show QR setup screen BEFORE disclaimer
+        landingScreen.style.display = 'none';
+        document.getElementById('qrSetupScreen').style.display = 'flex';
+        setupSecondaryCamera();
+      } catch (e) {
+        alert('Camera permission is required to start the exam.');
+        startExamBtn.disabled = false;
+        startExamBtn.textContent = originalBtnText;
+      }
+    });
+
+    // ── QR Setup Screen Handlers ──
+    document.getElementById('qrContinueBtn').addEventListener('click', () => {
+      document.getElementById('qrSetupScreen').style.display = 'none';
+      document.getElementById('disclaimerModal').style.display = 'flex';
+    });
+
+    document.getElementById('qrSkipBtn').addEventListener('click', () => {
+      // Clean up secondary peer if not connected
+      if (secondaryPeer && !secondaryConn) {
+        try { secondaryPeer.destroy(); } catch (e) {}
+        secondaryPeer = null;
+      }
+      document.getElementById('qrSetupScreen').style.display = 'none';
+      document.getElementById('disclaimerModal').style.display = 'flex';
+    });
+
+    // ── Disclaimer Handlers ──
+    document.getElementById('disclaimerStartBtn').addEventListener('click', () => {
+      document.getElementById('disclaimerModal').style.display = 'none';
+
+      // Activate Electron kiosk/fullscreen mode NOW (after student agrees)
+      if (window.electronAPI && window.electronAPI.startExam) {
+        window.electronAPI.startExam();
+        console.log('[ARGUS] Electron kiosk mode activated via IPC');
+      }
+
+      // Store student info in localStorage
+      localStorage.setItem('argus_student', studentName);
+      localStorage.setItem('argus_exam_code', examCode);
+
+      // Proceed to face alignment → calibration → exam
+      startFaceAlignmentFlow();
+    });
+
+    document.getElementById('disclaimerExitBtn').addEventListener('click', () => {
+      document.getElementById('disclaimerModal').style.display = 'none';
+      // Clean up secondary camera
+      if (secondaryPeer) {
+        try { secondaryPeer.destroy(); } catch (e) {}
+        secondaryPeer = null;
+      }
+      // Go back to credentials screen — NO fullscreen, NO kiosk
+      landingScreen.style.display = 'flex';
+    });
+
+    // ══════════════════════════════════════════
+    // FACE ALIGNMENT FLOW
+    // ══════════════════════════════════════════
+    let faceAlignInterval = null;
+    let faceAlignModelsLoaded = false;
+    let consecutiveCenteredFrames = 0;
+    const REQUIRED_CENTERED_FRAMES = 10; // ~2 seconds of being centered
+
+    async function startFaceAlignmentFlow() {
+      landingScreen.style.display = 'none';
+      const faceAlignScreen = document.getElementById('faceAlignScreen');
+      faceAlignScreen.style.display = 'flex';
+
+      const alignVideo = document.getElementById('alignVideo');
+      alignVideo.srcObject = webcamStream;
+
+      const statusIcon = document.getElementById('faceStatusIcon');
+      const statusText = document.getElementById('faceStatusText');
+      const hints = document.getElementById('faceAlignHints');
+      const continueBtn = document.getElementById('faceAlignContinueBtn');
+      const ovalGuide = document.getElementById('faceOvalGuide');
+
+      continueBtn.disabled = true;
+      consecutiveCenteredFrames = 0;
+      ovalGuide.className = 'face-oval-guide';
+
+      // Load face-api models if not already loaded
+      if (!faceAlignModelsLoaded) {
+        statusIcon.textContent = '⏳';
+        statusText.textContent = 'Loading face detection models...';
+        try {
+          if (typeof faceapi !== 'undefined') {
+            const MODEL_URL = 'https://justadudewhohacks.github.io/face-api.js/models';
+            await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
+            faceAlignModelsLoaded = true;
+            console.log('[ARGUS] Face alignment models loaded');
+          } else {
+            // face-api not loaded yet — wait for it
+            await new Promise((resolve, reject) => {
+              let attempts = 0;
+              const waitInterval = setInterval(() => {
+                attempts++;
+                if (typeof faceapi !== 'undefined') {
+                  clearInterval(waitInterval);
+                  resolve();
+                } else if (attempts > 20) {
+                  clearInterval(waitInterval);
+                  reject(new Error('face-api.js failed to load'));
+                }
+              }, 500);
+            });
+            const MODEL_URL = 'https://justadudewhohacks.github.io/face-api.js/models';
+            await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
+            faceAlignModelsLoaded = true;
+          }
+        } catch (e) {
+          console.warn('[ARGUS] Face alignment model load failed:', e);
+          statusIcon.textContent = '⚠️';
+          statusText.textContent = 'Could not load face detection. You may continue anyway.';
+          continueBtn.disabled = false;
+          return;
+        }
+      }
+
+      statusIcon.textContent = '🔍';
+      statusText.textContent = 'Detecting your face...';
+      hints.style.display = 'flex';
+
+      // Start continuous face alignment checking
+      faceAlignInterval = setInterval(() => checkFaceAlignment(), 200);
     }
 
-    console.log('[ARGUS] Running face comparison...');
-    const detection = await faceapi
-      .detectSingleFace(video, new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.3 }))
-      .withFaceLandmarks(true)
-      .withFaceDescriptor();
+    async function checkFaceAlignment() {
+      const alignVideo = document.getElementById('alignVideo');
+      const statusIcon = document.getElementById('faceStatusIcon');
+      const statusText = document.getElementById('faceStatusText');
+      const continueBtn = document.getElementById('faceAlignContinueBtn');
+      const ovalGuide = document.getElementById('faceOvalGuide');
+      const hintH = document.getElementById('hintHorizontal');
+      const hintV = document.getElementById('hintVertical');
+      const hintS = document.getElementById('hintSize');
 
-    if (!detection) {
-      console.log('[ARGUS] No face detected for comparison');
-      return;
+      if (!alignVideo || alignVideo.videoWidth === 0) return;
+
+      try {
+        const detection = await faceapi.detectSingleFace(alignVideo, new faceapi.TinyFaceDetectorOptions());
+
+        if (!detection) {
+          statusIcon.textContent = '❌';
+          statusText.textContent = 'No face detected — make sure your face is visible';
+          ovalGuide.className = 'face-oval-guide error';
+          consecutiveCenteredFrames = 0;
+          continueBtn.disabled = true;
+          setHint(hintH, false, 'Face not found');
+          setHint(hintV, false, 'Face not found');
+          setHint(hintS, false, 'Face not found');
+          return;
+        }
+
+        const box = detection.box;
+        const videoW = alignVideo.videoWidth;
+        const videoH = alignVideo.videoHeight;
+
+        // Face center relative to video (0-1 range)
+        const faceCenterX = (box.x + box.width / 2) / videoW;
+        const faceCenterY = (box.y + box.height / 2) / videoH;
+        const faceWidthRatio = box.width / videoW;
+        const faceHeightRatio = box.height / videoH;
+
+        // Check centering (ideal: 0.5, tolerance: ±0.15)
+        const hCentered = Math.abs(faceCenterX - 0.5) < 0.15;
+        const vCentered = Math.abs(faceCenterY - 0.5) < 0.18;
+
+        // Check size (face should be ~20-55% of video width)
+        const sizeOk = faceWidthRatio > 0.18 && faceWidthRatio < 0.55;
+
+        // Determine direction hints
+        let hHint = 'Centered horizontally ✓';
+        if (!hCentered) {
+          hHint = faceCenterX < 0.5 ? 'Move right →' : '← Move left';
+        }
+
+        let vHint = 'Centered vertically ✓';
+        if (!vCentered) {
+          vHint = faceCenterY < 0.5 ? 'Move down ↓' : '↑ Move up';
+        }
+
+        let sHint = 'Face size OK ✓';
+        if (!sizeOk) {
+          sHint = faceWidthRatio < 0.18 ? 'Move closer to camera' : 'Move further from camera';
+        }
+
+        setHint(hintH, hCentered, hHint);
+        setHint(hintV, vCentered, vHint);
+        setHint(hintS, sizeOk, sHint);
+
+        const allGood = hCentered && vCentered && sizeOk;
+
+        if (allGood) {
+          consecutiveCenteredFrames++;
+          ovalGuide.className = 'face-oval-guide success';
+
+          if (consecutiveCenteredFrames >= REQUIRED_CENTERED_FRAMES) {
+            statusIcon.textContent = '✅';
+            statusText.textContent = 'Face aligned perfectly! You can continue.';
+            continueBtn.disabled = false;
+          } else {
+            statusIcon.textContent = '🟢';
+            statusText.textContent = 'Hold still... verifying alignment (' + Math.round((consecutiveCenteredFrames / REQUIRED_CENTERED_FRAMES) * 100) + '%)';
+            continueBtn.disabled = true;
+          }
+        } else {
+          consecutiveCenteredFrames = 0;
+          ovalGuide.className = 'face-oval-guide warning';
+          statusIcon.textContent = '⚠️';
+          statusText.textContent = 'Adjust your position — follow the hints below';
+          continueBtn.disabled = true;
+        }
+      } catch (e) {
+        console.warn('[ARGUS] Face alignment check error:', e);
+      }
     }
 
-    // Compare with reference face using euclidean distance
-    const distance = faceapi.euclideanDistance(
-      referenceFaceDescriptor,
-      detection.descriptor
-    );
+    function setHint(el, ok, text) {
+      el.className = 'face-hint ' + (ok ? 'hint-ok' : 'hint-warn');
+      el.querySelector('.hint-text').textContent = text;
+    }
 
-    console.log('[ARGUS] 🔍 Face match distance:', distance.toFixed(3), '(threshold: >0.6 = mismatch)');
+    function stopFaceAlignment() {
+      if (faceAlignInterval) {
+        clearInterval(faceAlignInterval);
+        faceAlignInterval = null;
+      }
+    }
 
-    // distance < 0.4 = same person (confident match)
-    // distance 0.4-0.6 = uncertain
-    // distance > 0.6 = different person
-    if (distance > 0.6) {
-      console.log('[ARGUS] 🚨🚨🚨 FACE MISMATCH DETECTED! Distance:', distance.toFixed(3));
+    // Continue button → go to calibration
+    document.getElementById('faceAlignContinueBtn').addEventListener('click', () => {
+      stopFaceAlignment();
+      document.getElementById('faceAlignScreen').style.display = 'none';
+      startCalibrationFlow();
+    });
 
-      if (!faceMismatchCooldown) {
-        faceMismatchCooldown = true;
 
-        // Show PERSISTENT strong warning (not auto-dismiss)
-        showFaceMismatchWarning(distance);
 
-        // Add flag with confidence score
-        const confidence = Math.min(Math.round((distance - 0.4) * 100), 100);
-        addFlag(
-          'face_mismatch',
-          'Different face detected — possible impersonation (confidence: ' + confidence + '%, distance: ' + distance.toFixed(3) + ')'
+    async function startExam() {
+      if (!webcamStream) {
+        alert('Camera permission is required to start the exam.');
+        return;
+      }
+
+      // Reset per-session state
+      flags = [];
+      snapshots = [];
+      flagCount = 0;
+      timerSeconds = EXAM_DURATION;
+      warningQueue = [];
+      showingWarning = false;
+      eyeTrackingFlagCount = 0;
+      eyeTrackingSuspicionBonus = 0;
+      localStorage.setItem('eyeTrackingFlags', '0');
+      localStorage.setItem('argus_eye_suspicion_bonus', '0');
+
+      flagCountEl.textContent = '0';
+      suspicionBadge.className = 'suspicion-badge';
+
+      localStorage.setItem('argus_student', studentName);
+      localStorage.setItem('argus_examCode', examCode);
+      localStorage.setItem('argus_flags', '[]');
+      localStorage.setItem('argus_snapshots', '[]');
+      localStorage.setItem('argus_startTime', Date.now().toString());
+
+      renderQuestions();
+
+      // Set dynamic exam date
+      const dateEl = document.getElementById('examDate');
+      if (dateEl) {
+        const now = new Date();
+        dateEl.textContent = now.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+      }
+
+      // Only transition to the exam screen after permission + credentials
+      landingScreen.style.display = 'none';
+      calibrationScreen.style.display = 'none';
+      document.getElementById('faceAlignScreen').style.display = 'none';
+      examScreen.style.display = 'block';
+
+      // Attach stream once we show the exam UI
+      webcamVideo.srcObject = webcamStream;
+
+      // Exam "start moment" happens here (timer/flags/timestamps rely on this)
+      examStartTime = Date.now();
+      examActive = true;
+
+
+
+      // Fullscreen should be activated after permission + credentials
+      enterFullscreen();
+
+      // Proctoring and timers must start ONLY here
+      attachProctoring();
+      startTimer();
+      startSnapshots();
+
+      // Face detection models MUST load before capturing reference face
+      await initFaceDetection();
+      captureReferenceFace();
+
+      // Start audio monitoring
+      if (audioStream) {
+        setupAudioMonitoring();
+      }
+
+      // Secondary camera was already set up on the QR setup screen
+      // (QR code shown before disclaimer)
+    }
+
+    // ── Fullscreen ──
+    function enterFullscreen() {
+      // Set grace period to suppress false tab_switch flags during fullscreen transition
+      fullscreenGracePeriod = true;
+      setTimeout(() => { fullscreenGracePeriod = false; }, 2000);
+      console.log('[ARGUS] Fullscreen grace period started (2s)');
+      const el = document.documentElement;
+      (el.requestFullscreen || el.webkitRequestFullscreen || el.msRequestFullscreen || function () { }).call(el);
+    }
+
+    // ── Webcam ──
+    async function ensureCameraPermission() {
+      if (webcamStream) return webcamStream;
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+        webcamStream = stream;
+
+        // Also request microphone for audio monitoring
+        try {
+          audioStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+          console.log('[ARGUS] 🎙 Microphone permission granted');
+        } catch (micErr) {
+          console.warn('[ARGUS] Microphone access denied (audio monitoring disabled):', micErr.message);
+        }
+
+        return webcamStream;
+      } catch (e) {
+        console.warn('Webcam access denied:', e);
+        throw e;
+      }
+    }
+
+    // ── Snapshots ──
+    function startSnapshots() {
+      captureSnapshot('exam_start');
+      snapshotInterval = setInterval(() => captureSnapshot('periodic'), SNAPSHOT_INTERVAL);
+    }
+
+    function captureSnapshot(reason) {
+      if (!webcamVideo.srcObject || webcamVideo.videoWidth === 0) return;
+      snapshotCanvas.width = 320;
+      snapshotCanvas.height = 240;
+      const ctx = snapshotCanvas.getContext('2d');
+      ctx.drawImage(webcamVideo, 0, 0, 320, 240);
+      const dataUrl = snapshotCanvas.toDataURL('image/jpeg', 0.6);
+      const elapsedSecs = Math.round((Date.now() - examStartTime) / 1000);
+      const entry = {
+        timestamp: new Date().toISOString(),
+        elapsed: elapsedSecs,
+        reason: reason,
+        image: dataUrl
+      };
+      snapshots.push(entry);
+      // Keep max 40 to avoid localStorage limits
+      if (snapshots.length > 40) snapshots.shift();
+      localStorage.setItem('argus_snapshots', JSON.stringify(snapshots));
+
+
+    }
+
+    // ── Timer ──
+    function startTimer() {
+      updateTimerDisplay();
+      timerInterval = setInterval(() => {
+        timerSeconds--;
+        updateTimerDisplay();
+        if (timerSeconds <= 0) {
+          clearInterval(timerInterval);
+          endExam();
+        }
+      }, 1000);
+    }
+
+    function updateTimerDisplay() {
+      const h = Math.floor(timerSeconds / 3600).toString().padStart(2, '0');
+      const m = Math.floor((timerSeconds % 3600) / 60).toString().padStart(2, '0');
+      const s = (timerSeconds % 60).toString().padStart(2, '0');
+      if (timerValueEl) {
+        timerValueEl.textContent = h + ' : ' + m + ' : ' + s;
+      }
+    }
+
+    // ── Flagging ──
+    function addFlag(type, detail) {
+      console.log('FLAG FUNCTION CALLED', type, detail);
+      const elapsedSecs = Math.round((Date.now() - examStartTime) / 1000);
+      const entry = {
+        type, detail,
+        timestamp: new Date().toISOString(),
+        elapsedSeconds: elapsedSecs
+      };
+      flags.push(entry);
+      flagCount++;
+      flagCountEl.textContent = flagCount;
+
+      if (flagCount >= 5) suspicionBadge.className = 'suspicion-badge danger';
+      else if (flagCount >= 2) suspicionBadge.className = 'suspicion-badge warning';
+
+      localStorage.setItem('argus_flags', JSON.stringify(flags));
+
+
+
+      // Capture snapshot on flag
+      captureSnapshot('flag_' + type);
+
+      showWarning(detail);
+    }
+
+    function showWarning(text) {
+      warningQueue.push(text);
+      if (!showingWarning) displayNextWarning();
+    }
+
+    function displayNextWarning() {
+      if (warningQueue.length === 0) { showingWarning = false; return; }
+      showingWarning = true;
+      warningText.textContent = 'ARGUS has detected suspicious activity: ' + warningQueue.shift();
+      warningOverlay.style.display = 'flex';
+    }
+
+    warningDismiss.addEventListener('click', () => {
+      warningOverlay.style.display = 'none';
+      displayNextWarning();
+    });
+
+    function showFullscreenRequiredModal() {
+      if (!examActive) return;
+      if (fullscreenModalOpen) return;
+      fullscreenModalOpen = true;
+      fullscreenModal.style.display = 'flex';
+    }
+
+    function hideFullscreenRequiredModal() {
+      fullscreenModalOpen = false;
+      fullscreenModal.style.display = 'none';
+    }
+
+    fullscreenReturnBtn.addEventListener('click', () => {
+      // Browser fullscreen requires a user gesture → only request fullscreen here.
+      enterFullscreen();
+      hideFullscreenRequiredModal();
+    });
+
+
+
+    // ── Proctoring Listeners ──
+    function attachProctoring() {
+      if (proctoringAttached) return;
+      proctoringAttached = true;
+
+      document.addEventListener('visibilitychange', () => {
+        if (!examActive) return;
+        if (document.hidden && !fullscreenGracePeriod) {
+          addFlag('tab_switch', 'Student switched to another tab');
+        } else if (document.hidden && fullscreenGracePeriod) {
+          console.log('[ARGUS] Suppressed false tab_switch during fullscreen transition');
+        }
+      });
+
+      function onFullscreenChange() {
+        if (!examActive) return;
+        if (!document.fullscreenElement) {
+          addFlag('fullscreen_exit', 'Student exited fullscreen mode');
+          showFullscreenRequiredModal();
+        }
+      }
+
+      document.addEventListener('fullscreenchange', onFullscreenChange);
+      document.addEventListener('webkitfullscreenchange', onFullscreenChange);
+
+      document.addEventListener('copy', (e) => {
+        e.preventDefault();
+        addFlag('copy_attempt', 'Student attempted to copy content (Ctrl+C)');
+      });
+
+      document.addEventListener('paste', (e) => {
+        e.preventDefault();
+        addFlag('paste_attempt', 'Student attempted to paste content (Ctrl+V)');
+      }, true);
+
+      document.addEventListener('keydown', (e) => {
+        const key = (e.key || '').toLowerCase();
+
+        // ESC handling: can't always prevent leaving fullscreen, but we always flag + warn.
+        if (key === 'escape') {
+          try { e.preventDefault(); } catch (_) { }
+          addFlag('escape_attempt', 'Student pressed ESC (attempted to exit fullscreen)');
+          showFullscreenRequiredModal();
+          return;
+        }
+
+        const isModifier = e.ctrlKey || e.metaKey;
+        if (!isModifier) return;
+
+        // Block common shortcuts
+        if (key === 'c') {
+          e.preventDefault();
+          addFlag('copy_attempt', 'Student attempted to copy content (Ctrl+C)');
+        } else if (key === 'v') {
+          e.preventDefault();
+          addFlag('paste_attempt', 'Student attempted to paste content (Ctrl+V)');
+        } else if (key === 'a') {
+          e.preventDefault();
+          addFlag('select_all_attempt', 'Student attempted to select all content (Ctrl+A)');
+        } else if (key === 'u') {
+          e.preventDefault();
+          addFlag('view_source_attempt', 'Student attempted to view source (Ctrl+U)');
+        }
+      }, true);
+
+      document.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        addFlag('right_click', 'Student attempted to right-click');
+      });
+    }
+
+    // ── Face Detection ──
+    async function initFaceDetection() {
+      if (typeof faceapi === 'undefined') { console.warn('face-api.js not loaded'); return; }
+      try {
+        const MODEL_URL = 'https://justadudewhohacks.github.io/face-api.js/models';
+        await Promise.all([
+          faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
+          faceapi.nets.faceLandmark68TinyNet.loadFromUri(MODEL_URL),
+          faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL)
+        ]);
+        console.log('[ARGUS] All face-api models loaded');
+
+        // Existing face count check every 8s
+        faceDetectionInterval = setInterval(async () => {
+          if (!webcamVideo.srcObject) return;
+          try {
+            const detections = await faceapi.detectAllFaces(webcamVideo, new faceapi.TinyFaceDetectorOptions());
+            if (detections.length === 0) addFlag('no_face', 'Student looked away from screen');
+            else if (detections.length > 1) addFlag('multiple_faces', `Multiple faces detected (${detections.length} faces)`);
+          } catch (e) { }
+        }, 8000);
+
+        // Head turn detection every 200ms
+        headTurnInterval = setInterval(async () => {
+          if (!examActive) return;
+          await checkHeadPose();
+        }, 200);
+      } catch (e) { console.warn('Face detection init failed:', e); }
+    }
+
+    async function checkHeadPose() {
+      try {
+        // Guard: don't run if models not loaded
+        if (!faceapi.nets.tinyFaceDetector.isLoaded) {
+          console.log('[ARGUS] Models not ready yet');
+          return;
+        }
+
+        const video = document.querySelector('video[id*="webcam"], #webcamVideo, video');
+        if (!video) return;
+
+        const detection = await faceapi.detectSingleFace(video, new faceapi.TinyFaceDetectorOptions()).withFaceLandmarks(true);
+        if (!detection) return;
+
+        const landmarks = detection.landmarks;
+        const nose = landmarks.getNose();
+        const jaw = landmarks.getJawOutline();
+
+        // Get nose tip (index 3)
+        const noseTip = nose[3];
+
+        // Get jaw left and right points
+        const jawLeft = jaw[0];
+        const jawRight = jaw[jaw.length - 1];
+
+        // Calculate face center x
+        const faceCenterX = (jawLeft.x + jawRight.x) / 2;
+
+        // Face width
+        const faceWidth = jawRight.x - jawLeft.x;
+
+        // How far nose is from center relative to face width
+        const noseOffset = Math.abs(noseTip.x - faceCenterX);
+        const ratio = noseOffset / faceWidth;
+
+        console.log('[ARGUS] Nose offset ratio:', ratio.toFixed(2));
+
+        // If nose is more than 20% off center = head turned
+        if (ratio > 0.20) {
+          console.log('[ARGUS] HEAD TURN DETECTED:', ratio.toFixed(2));
+
+          if (!headTurnTimer) {
+            headTurnTimer = setTimeout(() => {
+              if (!eyeFlagCooldown) {
+                eyeFlagCooldown = true;
+                addFlag('head_turn', 'Student turned head away from screen');
+                setTimeout(() => {
+                  eyeFlagCooldown = false;
+                }, 5000);
+              }
+              headTurnTimer = null;
+            }, 400);
+          }
+        } else {
+          if (headTurnTimer) {
+            clearTimeout(headTurnTimer);
+            headTurnTimer = null;
+          }
+        }
+
+        // ── Vertical gaze detection (looking down / up) ──
+        // Get face bounding box
+        const box = detection.detection.box;
+
+        // Get nose tip y position
+        const noseTipY = nose[3];
+
+        // Face height
+        const faceHeight = box.height;
+
+        // How far nose is from top of face box
+        const noseVerticalRatio = (noseTipY.y - box.y) / faceHeight;
+
+        console.log('[ARGUS] Nose vertical ratio:', noseVerticalRatio.toFixed(2));
+
+        // Normal looking forward = ~0.40-0.55
+        // Looking down = ratio increases > 0.57
+        // Looking up = ratio decreases < 0.35 (was 0.45 — too sensitive)
+        if (noseVerticalRatio > 0.57) {
+          console.log('[ARGUS] LOOKING DOWN DETECTED:', noseVerticalRatio.toFixed(2));
+
+          // Show warning popup IMMEDIATELY (but only if not in cooldown)
+          if (!verticalCooldown) {
+            showWarningPopup('ARGUS detected suspicious eye movement — looking down');
+          }
+
+          // Then start timer for flag storage (separate from popup)
+          if (!verticalTurnTimer && !verticalCooldown) {
+            verticalTurnTimer = setTimeout(() => {
+              verticalCooldown = true;
+              addFlag('head_turn', 'Student looked down - possibly cheating from phone');
+              setTimeout(() => {
+                verticalCooldown = false;
+              }, 2000);
+              verticalTurnTimer = null;
+            }, 400);
+          }
+        } else if (noseVerticalRatio < 0.35) {
+          console.log('[ARGUS] LOOKING UP DETECTED:', noseVerticalRatio.toFixed(2));
+
+          // Show warning popup IMMEDIATELY (but only if not in cooldown)
+          if (!verticalCooldown) {
+            showWarningPopup('ARGUS detected suspicious eye movement — looking up');
+          }
+
+          // Then start timer for flag storage (separate from popup)
+          if (!verticalTurnTimer && !verticalCooldown) {
+            verticalTurnTimer = setTimeout(() => {
+              verticalCooldown = true;
+              addFlag('head_turn', 'Student looked up from screen');
+              setTimeout(() => {
+                verticalCooldown = false;
+              }, 2000);
+              verticalTurnTimer = null;
+            }, 300);
+          }
+        } else {
+          // Gaze returned to normal — cancel pending vertical timer
+          if (verticalTurnTimer) {
+            clearTimeout(verticalTurnTimer);
+            verticalTurnTimer = null;
+          }
+        }
+      } catch (e) {
+        // silently ignore
+      }
+    }
+
+    // ── Face Mismatch Detection ──
+    let referenceFaceCaptureAttempts = 0;
+
+    async function captureReferenceFace() {
+      referenceFaceCaptureAttempts++;
+      console.log('[ARGUS] captureReferenceFace attempt #' + referenceFaceCaptureAttempts);
+
+      try {
+        console.log('[ARGUS] Waiting 2s before capturing reference face...');
+        await new Promise(r => setTimeout(r, 2000));
+
+        // Wait for face recognition model to load
+        if (typeof faceapi === 'undefined') {
+          console.warn('[ARGUS] face-api.js not available, retrying in 3s...');
+          if (referenceFaceCaptureAttempts < 20) setTimeout(captureReferenceFace, 3000);
+          return;
+        }
+
+        if (!faceapi.nets.faceRecognitionNet.isLoaded) {
+          console.log('[ARGUS] Face recognition model not loaded yet, retrying in 3s...');
+          if (referenceFaceCaptureAttempts < 20) setTimeout(captureReferenceFace, 3000);
+          return;
+        }
+
+        const video = document.querySelector('#webcamVideo, video');
+        if (!video || video.videoWidth === 0) {
+          console.log('[ARGUS] Video not ready, retrying in 2s...');
+          if (referenceFaceCaptureAttempts < 20) setTimeout(captureReferenceFace, 2000);
+          return;
+        }
+
+        console.log('[ARGUS] Running face detection on video...');
+        const detection = await faceapi
+          .detectSingleFace(video, new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.3 }))
+          .withFaceLandmarks(true)
+          .withFaceDescriptor();
+
+        console.log('[ARGUS] Detection result:', detection ? 'FACE FOUND' : 'NO FACE');
+
+        if (detection) {
+          referenceFaceDescriptor = detection.descriptor;
+          console.log('[ARGUS] ✅ Reference face descriptor captured, length:', referenceFaceDescriptor.length);
+
+          // Store reference snapshot
+          try {
+            const canvas = document.createElement('canvas');
+            canvas.width = 320;
+            canvas.height = 240;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(video, 0, 0, 320, 240);
+            const refSnapshot = canvas.toDataURL('image/jpeg', 0.7);
+            localStorage.setItem('argus_reference_snapshot', refSnapshot);
+            console.log('[ARGUS] Reference face snapshot stored in localStorage');
+          } catch (snapErr) {
+            console.warn('[ARGUS] Could not store reference snapshot:', snapErr);
+          }
+
+          // Show confirmation toast
+          showWarningPopup('Identity verified ✅ — Reference face captured');
+
+          // Start periodic face match checks every 15 seconds
+          console.log('[ARGUS] Starting face mismatch checks every 15s');
+          faceMismatchInterval = setInterval(() => {
+            if (!examActive) return;
+            checkFaceMatch();
+          }, 15000);
+
+          // Also run first check after 10 seconds
+          setTimeout(() => {
+            if (examActive) checkFaceMatch();
+          }, 10000);
+        } else {
+          console.log('[ARGUS] Could not detect face for reference, retrying in 2s...');
+          if (referenceFaceCaptureAttempts < 20) setTimeout(captureReferenceFace, 2000);
+        }
+      } catch (e) {
+        console.warn('[ARGUS] Face capture error:', e.message || e);
+        if (referenceFaceCaptureAttempts < 20) setTimeout(captureReferenceFace, 3000);
+      }
+    }
+
+    async function checkFaceMatch() {
+      console.log('[ARGUS] checkFaceMatch() called');
+      try {
+        if (!referenceFaceDescriptor) {
+          console.log('[ARGUS] No reference face descriptor, skipping check');
+          return;
+        }
+        if (typeof faceapi === 'undefined' || !faceapi.nets.faceRecognitionNet.isLoaded) {
+          console.log('[ARGUS] Face recognition model not loaded, skipping check');
+          return;
+        }
+
+        const video = document.querySelector('#webcamVideo, video');
+        if (!video || video.videoWidth === 0) {
+          console.log('[ARGUS] Video not available for face check');
+          return;
+        }
+
+        console.log('[ARGUS] Running face comparison...');
+        const detection = await faceapi
+          .detectSingleFace(video, new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.3 }))
+          .withFaceLandmarks(true)
+          .withFaceDescriptor();
+
+        if (!detection) {
+          console.log('[ARGUS] No face detected for comparison');
+          return;
+        }
+
+        // Compare with reference face using euclidean distance
+        const distance = faceapi.euclideanDistance(
+          referenceFaceDescriptor,
+          detection.descriptor
         );
 
-        // Capture a snapshot of the mismatch
-        captureSnapshot('flag_face_mismatch');
+        console.log('[ARGUS] 🔍 Face match distance:', distance.toFixed(3), '(threshold: >0.6 = mismatch)');
 
-        // Cooldown — 30 seconds to avoid spam
-        setTimeout(() => {
-          faceMismatchCooldown = false;
-        }, 30000);
+        // distance < 0.4 = same person (confident match)
+        // distance 0.4-0.6 = uncertain
+        // distance > 0.6 = different person
+        if (distance > 0.6) {
+          console.log('[ARGUS] 🚨🚨🚨 FACE MISMATCH DETECTED! Distance:', distance.toFixed(3));
+
+          if (!faceMismatchCooldown) {
+            faceMismatchCooldown = true;
+
+            // Show PERSISTENT strong warning (not auto-dismiss)
+            showFaceMismatchWarning(distance);
+
+            // Add flag with confidence score
+            const confidence = Math.min(Math.round((distance - 0.4) * 100), 100);
+            addFlag(
+              'face_mismatch',
+              'Different face detected — possible impersonation (confidence: ' + confidence + '%, distance: ' + distance.toFixed(3) + ')'
+            );
+
+            // Capture a snapshot of the mismatch
+            captureSnapshot('flag_face_mismatch');
+
+            // Cooldown — 30 seconds to avoid spam
+            setTimeout(() => {
+              faceMismatchCooldown = false;
+            }, 30000);
+          }
+        } else if (distance > 0.4 && distance <= 0.6) {
+          console.log('[ARGUS] Face uncertain:', distance.toFixed(3));
+        } else {
+          console.log('[ARGUS] Face matched ✅:', distance.toFixed(3));
+        }
+      } catch (e) {
+        console.warn('[ARGUS] Face match check error:', e.message || e);
       }
-    } else if (distance > 0.4 && distance <= 0.6) {
-      console.log('[ARGUS] Face uncertain:', distance.toFixed(3));
-    } else {
-      console.log('[ARGUS] Face matched ✅:', distance.toFixed(3));
     }
-  } catch (e) {
-    console.warn('[ARGUS] Face match check error:', e.message || e);
-  }
-}
 
-// Persistent face mismatch warning that stays on screen
-function showFaceMismatchWarning(distance) {
-  // Remove existing mismatch warning
-  const existing = document.getElementById('argusFaceMismatchWarning');
-  if (existing) existing.remove();
+    // Persistent face mismatch warning that stays on screen
+    function showFaceMismatchWarning(distance) {
+      // Remove existing mismatch warning
+      const existing = document.getElementById('argusFaceMismatchWarning');
+      if (existing) existing.remove();
 
-  const popup = document.createElement('div');
-  popup.id = 'argusFaceMismatchWarning';
-  popup.style.cssText = `
+      const popup = document.createElement('div');
+      popup.id = 'argusFaceMismatchWarning';
+      popup.style.cssText = `
     position: fixed;
     top: 0; left: 0; right: 0;
     z-index: 999999;
@@ -1735,231 +1859,641 @@ function showFaceMismatchWarning(distance) {
     box-shadow: 0 4px 30px rgba(255,23,68,0.7);
     animation: argusSlideDown 0.3s ease-out;
   `;
-  popup.innerHTML = `
+      popup.innerHTML = `
     <div style="font-size:20px;font-weight:800;margin-bottom:4px;">🚨 IDENTITY MISMATCH DETECTED 🚨</div>
     <div style="font-size:14px;opacity:0.9;">ARGUS detected a different face — possible impersonation attempt</div>
     <div style="font-size:12px;opacity:0.7;margin-top:4px;">Distance: ${distance.toFixed(3)} | This event has been logged</div>
   `;
 
-  document.body.appendChild(popup);
+      document.body.appendChild(popup);
 
-  // Auto-dismiss after 6 seconds (longer than normal warnings)
-  setTimeout(() => {
-    if (popup.parentNode) {
-      popup.style.animation = 'argusSlideUp 0.3s ease-in forwards';
-      setTimeout(() => { if (popup.parentNode) popup.remove(); }, 300);
+      // Auto-dismiss after 6 seconds (longer than normal warnings)
+      setTimeout(() => {
+        if (popup.parentNode) {
+          popup.style.animation = 'argusSlideUp 0.3s ease-in forwards';
+          setTimeout(() => { if (popup.parentNode) popup.remove(); }, 300);
+        }
+      }, 6000);
+
+      console.log('[ARGUS] 🚨 Face mismatch warning shown to student');
     }
-  }, 6000);
 
-  console.log('[ARGUS] 🚨 Face mismatch warning shown to student');
-}
-
-// ══════════════════════════════════════════
-// AUDIO DETECTION (Web Audio API)
-// ══════════════════════════════════════════
-function setupAudioMonitoring() {
-  if (!audioStream) {
-    console.warn('[ARGUS] No audio stream available, skipping audio monitoring');
-    const indicator = document.getElementById('audioIndicator');
-    if (indicator) indicator.style.display = 'none';
-    return;
-  }
-
-  try {
-    audioContext = new (window.AudioContext || window.webkitAudioContext)();
-    audioAnalyser = audioContext.createAnalyser();
-    const microphone = audioContext.createMediaStreamSource(audioStream);
-
-    audioAnalyser.fftSize = 256;
-    microphone.connect(audioAnalyser);
-
-    audioDataArray = new Uint8Array(audioAnalyser.frequencyBinCount);
-
-    console.log('[ARGUS] 🎙 Audio analyser initialized, starting ambient calibration...');
-    updateAudioIndicator(false);
-
-    // ── STEP 1: Calibrate ambient noise for 3 seconds ──
-    const calibrationSamples = [];
-    const calibrateInterval = setInterval(() => {
-      audioAnalyser.getByteFrequencyData(audioDataArray);
-      const avg = audioDataArray.reduce((a, b) => a + b, 0) / audioDataArray.length;
-      calibrationSamples.push(avg);
-      console.log('[ARGUS] 🎙 Calibration sample #' + calibrationSamples.length + ': ' + avg.toFixed(2));
-
-      if (calibrationSamples.length >= 6) {
-        clearInterval(calibrateInterval);
-
-        ambientNoiseLevel = calibrationSamples.reduce((a, b) => a + b, 0) / calibrationSamples.length;
-        audioThreshold = ambientNoiseLevel + 15;
-
-        console.log('[ARGUS] 🎙 Ambient noise level: ' + ambientNoiseLevel.toFixed(2));
-        console.log('[ARGUS] 🎙 Audio threshold set to: ' + audioThreshold.toFixed(2));
-
-        // Start actual monitoring after calibration
-        startAudioMonitoring();
+    // ══════════════════════════════════════════
+    // AUDIO DETECTION (Web Audio API)
+    // ══════════════════════════════════════════
+    function setupAudioMonitoring() {
+      if (!audioStream) {
+        console.warn('[ARGUS] No audio stream available, skipping audio monitoring');
+        const indicator = document.getElementById('audioIndicator');
+        if (indicator) indicator.style.display = 'none';
+        return;
       }
-    }, 500);
 
-  } catch (e) {
-    console.warn('[ARGUS] Failed to setup audio monitoring:', e.message);
-    const indicator = document.getElementById('audioIndicator');
-    if (indicator) indicator.style.display = 'none';
-  }
-}
+      try {
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        audioAnalyser = audioContext.createAnalyser();
+        const microphone = audioContext.createMediaStreamSource(audioStream);
 
-function startAudioMonitoring() {
-  console.log('[ARGUS] 🎙 Audio monitoring started (threshold: ' + audioThreshold.toFixed(2) + ')');
+        audioAnalyser.fftSize = 256;
+        microphone.connect(audioAnalyser);
 
-  audioMonitorInterval = setInterval(() => {
-    if (!examActive || !audioAnalyser) return;
+        audioDataArray = new Uint8Array(audioAnalyser.frequencyBinCount);
 
-    audioAnalyser.getByteFrequencyData(audioDataArray);
+        console.log('[ARGUS] 🎙 Audio analyser initialized, starting ambient calibration...');
+        updateAudioIndicator(false);
 
-    // Calculate average volume
-    const average = audioDataArray.reduce((a, b) => a + b, 0) / audioDataArray.length;
+        // ── STEP 1: Calibrate ambient noise for 3 seconds ──
+        const calibrationSamples = [];
+        const calibrateInterval = setInterval(() => {
+          audioAnalyser.getByteFrequencyData(audioDataArray);
+          const avg = audioDataArray.reduce((a, b) => a + b, 0) / audioDataArray.length;
+          calibrationSamples.push(avg);
+          console.log('[ARGUS] 🎙 Calibration sample #' + calibrationSamples.length + ': ' + avg.toFixed(2));
 
-    // Loud threshold = ambient + 30 (for loud talking)
-    const loudThreshold = ambientNoiseLevel + 30;
+          if (calibrationSamples.length >= 6) {
+            clearInterval(calibrateInterval);
 
-    if (average > audioThreshold) {
-      // Suspicious audio detected
-      updateAudioIndicator(true);
+            ambientNoiseLevel = calibrationSamples.reduce((a, b) => a + b, 0) / calibrationSamples.length;
+            audioThreshold = ambientNoiseLevel + 15;
 
-      if (!audioSpikeTimer && !audioCooldown) {
-        // Wait 800ms of sustained audio before flagging (~1-2s total latency)
-        audioSpikeTimer = setTimeout(() => {
-          audioCooldown = true;
-          audioFlagCount++;
+            console.log('[ARGUS] 🎙 Ambient noise level: ' + ambientNoiseLevel.toFixed(2));
+            console.log('[ARGUS] 🎙 Audio threshold set to: ' + audioThreshold.toFixed(2));
 
-          const isLoud = average > loudThreshold;
+            // Start actual monitoring after calibration
+            startAudioMonitoring();
+          }
+        }, 500);
 
-          // Show warning popup
-          showWarningPopup(isLoud
-            ? '🎙 ARGUS detected loud audio activity near student'
-            : '🎙 ARGUS detected suspicious audio — possible whispering');
-
-          // Add flag
-          addFlag(
-            'audio_detected',
-            isLoud
-              ? 'Loud talking detected near student (level: ' + average.toFixed(1) + ', threshold: ' + audioThreshold.toFixed(1) + ')'
-              : 'Suspicious audio/whispering detected (level: ' + average.toFixed(1) + ', threshold: ' + audioThreshold.toFixed(1) + ')'
-          );
-
-          console.log('[ARGUS] 🎙 AUDIO FLAG #' + audioFlagCount + ' — level: ' + average.toFixed(2) + ', threshold: ' + audioThreshold.toFixed(2));
-
-          // Capture snapshot when audio flag triggers
-          captureSnapshot('flag_audio_detected');
-
-          // 8 second cooldown
-          setTimeout(() => {
-            audioCooldown = false;
-          }, 8000);
-
-          audioSpikeTimer = null;
-        }, 800);
+      } catch (e) {
+        console.warn('[ARGUS] Failed to setup audio monitoring:', e.message);
+        const indicator = document.getElementById('audioIndicator');
+        if (indicator) indicator.style.display = 'none';
       }
-    } else {
-      // Audio is within normal range
-      updateAudioIndicator(false);
+    }
 
+    function startAudioMonitoring() {
+      console.log('[ARGUS] 🎙 Audio monitoring started (threshold: ' + audioThreshold.toFixed(2) + ')');
+
+      audioMonitorInterval = setInterval(() => {
+        if (!examActive || !audioAnalyser) return;
+
+        audioAnalyser.getByteFrequencyData(audioDataArray);
+
+        // Calculate average volume
+        const average = audioDataArray.reduce((a, b) => a + b, 0) / audioDataArray.length;
+
+        // Loud threshold = ambient + 30 (for loud talking)
+        const loudThreshold = ambientNoiseLevel + 30;
+
+        if (average > audioThreshold) {
+          // Suspicious audio detected
+          updateAudioIndicator(true);
+
+          if (!audioSpikeTimer && !audioCooldown) {
+            // Wait 800ms of sustained audio before flagging (~1-2s total latency)
+            audioSpikeTimer = setTimeout(() => {
+              audioCooldown = true;
+              audioFlagCount++;
+
+              const isLoud = average > loudThreshold;
+
+              // Show warning popup
+              showWarningPopup(isLoud
+                ? '🎙 ARGUS detected loud audio activity near student'
+                : '🎙 ARGUS detected suspicious audio — possible whispering');
+
+              // Add flag
+              addFlag(
+                'audio_detected',
+                isLoud
+                  ? 'Loud talking detected near student (level: ' + average.toFixed(1) + ', threshold: ' + audioThreshold.toFixed(1) + ')'
+                  : 'Suspicious audio/whispering detected (level: ' + average.toFixed(1) + ', threshold: ' + audioThreshold.toFixed(1) + ')'
+              );
+
+              console.log('[ARGUS] 🎙 AUDIO FLAG #' + audioFlagCount + ' — level: ' + average.toFixed(2) + ', threshold: ' + audioThreshold.toFixed(2));
+
+              // Capture snapshot when audio flag triggers
+              captureSnapshot('flag_audio_detected');
+
+              // 8 second cooldown
+              setTimeout(() => {
+                audioCooldown = false;
+              }, 8000);
+
+              audioSpikeTimer = null;
+            }, 800);
+          }
+        } else {
+          // Audio is within normal range
+          updateAudioIndicator(false);
+
+          if (audioSpikeTimer) {
+            clearTimeout(audioSpikeTimer);
+            audioSpikeTimer = null;
+          }
+        }
+      }, 200);
+    }
+
+    function updateAudioIndicator(spike) {
+      const indicator = document.getElementById('audioIndicator');
+      if (!indicator) return;
+
+      if (spike) {
+        indicator.style.background = 'rgba(239,68,68,0.2)';
+        indicator.style.borderColor = 'rgba(239,68,68,0.5)';
+        indicator.title = 'Audio spike detected!';
+      } else {
+        indicator.style.background = 'rgba(16,185,129,0.15)';
+        indicator.style.borderColor = 'rgba(16,185,129,0.3)';
+        indicator.title = 'Audio monitoring active';
+      }
+    }
+
+    function stopAudioMonitoring() {
+      if (audioMonitorInterval) {
+        clearInterval(audioMonitorInterval);
+        audioMonitorInterval = null;
+      }
       if (audioSpikeTimer) {
         clearTimeout(audioSpikeTimer);
         audioSpikeTimer = null;
       }
+      if (audioContext && audioContext.state !== 'closed') {
+        try { audioContext.close(); } catch (e) { }
+      }
+      if (audioStream) {
+        audioStream.getTracks().forEach(t => t.stop());
+      }
+      console.log('[ARGUS] 🎙 Audio monitoring stopped');
     }
-  }, 200);
-}
 
-function updateAudioIndicator(spike) {
-  const indicator = document.getElementById('audioIndicator');
-  if (!indicator) return;
+    // ══════════════════════════════════════════
+    // SECONDARY CAMERA (PeerJS WebRTC)
+    // With Object Detection Alert Handling
+    // ══════════════════════════════════════════
+    let secondaryPeer = null;
+    let secondaryConn = null;
+    let secondarySnapshots = [];
+    let secondaryObjectDetections = []; // Store detection events
+    let objectDetectionCooldowns = {}; // Per-object cooldowns on the PC side
 
-  if (spike) {
-    indicator.style.background = 'rgba(239,68,68,0.2)';
-    indicator.style.borderColor = 'rgba(239,68,68,0.5)';
-    indicator.title = 'Audio spike detected!';
-  } else {
-    indicator.style.background = 'rgba(16,185,129,0.15)';
-    indicator.style.borderColor = 'rgba(16,185,129,0.3)';
-    indicator.title = 'Audio monitoring active';
-  }
-}
+    function setupSecondaryCamera() {
+      if (typeof Peer === 'undefined') {
+        console.warn('[ARGUS] PeerJS not loaded, secondary camera disabled');
+        return;
+      }
 
-function stopAudioMonitoring() {
-  if (audioMonitorInterval) {
-    clearInterval(audioMonitorInterval);
-    audioMonitorInterval = null;
-  }
-  if (audioSpikeTimer) {
-    clearTimeout(audioSpikeTimer);
-    audioSpikeTimer = null;
-  }
-  if (audioContext && audioContext.state !== 'closed') {
-    try { audioContext.close(); } catch (e) {}
-  }
-  if (audioStream) {
-    audioStream.getTracks().forEach(t => t.stop());
-  }
-  console.log('[ARGUS] 🎙 Audio monitoring stopped');
-}
+      // Show the navbar badge as "Not Connected" initially
+      const navBadge = document.getElementById('secondaryCamBadge');
+      if (navBadge) navBadge.style.display = 'flex';
 
-// ── End Exam ──
-function endExam() {
-  examActive = false;
-  hideFullscreenRequiredModal();
+      try {
+        // Generate unique room code
+        const suffix = Math.random().toString(36).substring(2, 8).toUpperCase();
+        const roomCode = 'ARGUS-' + suffix;
+        localStorage.setItem('argusRoomCode', roomCode);
+        console.log('[ARGUS] 📱 Room code:', roomCode, 'suffix:', suffix);
 
-  clearInterval(timerInterval);
-  clearInterval(snapshotInterval);
-  if (faceDetectionInterval) clearInterval(faceDetectionInterval);
-  if (headTurnInterval) clearInterval(headTurnInterval);
-  if (headTurnTimer) { clearTimeout(headTurnTimer); headTurnTimer = null; }
-  if (verticalTurnTimer) { clearTimeout(verticalTurnTimer); verticalTurnTimer = null; }
-  if (faceMismatchInterval) { clearInterval(faceMismatchInterval); faceMismatchInterval = null; }
-  stopEyeTracking();
-  stopAudioMonitoring();
+        // Display the room code on the setup screen
+        const roomCodeDisplay = document.getElementById('roomCodeDisplay');
+        if (roomCodeDisplay) roomCodeDisplay.textContent = roomCode;
 
-  captureSnapshot('exam_end');
+        // Create peer with room code as ID — use 0.peerjs.com to avoid blocked default server
+        secondaryPeer = new Peer(roomCode, {
+          host: '0.peerjs.com',
+          port: 443,
+          path: '/',
+          secure: true,
+          config: {
+            iceServers: [
+              { urls: 'stun:stun.l.google.com:19302' },
+              { urls: 'stun:stun1.l.google.com:19302' }
+            ]
+          }
+        });
 
-  const durationSecs = Math.round((Date.now() - examStartTime) / 1000);
-  localStorage.setItem('argus_duration', durationSecs.toString());
-  localStorage.setItem('argus_flags', JSON.stringify(flags));
-  localStorage.setItem('audioFlags', String(audioFlagCount));
-  localStorage.setItem('argus_snapshots', JSON.stringify(snapshots));
-  localStorage.setItem('eyeTrackingFlags', String(eyeTrackingFlagCount));
+        secondaryPeer.on('open', (id) => {
+          console.log('[ARGUS] 📱 Peer ready, ID:', id);
 
-  // Determine local suspicion score for DB update
-  const scoreMap = {
-    'tab_switch': 15, 'fullscreen_exit': 15, 'copy_attempt': 20,
-    'right_click': 10, 'multiple_faces': 25, 'no_face': 10, 'gaze_away': 8,
-    'recalibration_requested': 5, 'recalibration_complete': 0,
-    'face_mismatch': 35, 'audio_detected': 12
-  };
-  let score = 0;
-  flags.forEach(f => { score += scoreMap[f.type] || 10; });
-  score = Math.min(score, 100);
+          // Generate QR code URL pointing to mobile page
+          const phoneUrl = `http://172.27.67.154:8080/argus/mobile.html?room=${roomCode}`;
+          console.log('[ARGUS] 📱 Phone URL:', phoneUrl);
 
-  let tempVerdict = 'CLEAN';
-  if (score > 50) tempVerdict = 'HIGH RISK';
-  else if (score > 20) tempVerdict = 'SUSPICIOUS';
+          // Show URL as text fallback
+          const phoneUrlDisplay = document.getElementById('phoneUrlDisplay');
+          if (phoneUrlDisplay) phoneUrlDisplay.textContent = 'Or visit: ' + phoneUrl;
+
+          // Generate QR code on the SETUP SCREEN div (large, visible)
+          if (typeof QRCode !== 'undefined') {
+            const setupDiv = document.getElementById('qrSetupCode');
+            if (setupDiv) {
+              setupDiv.innerHTML = '';
+              new QRCode(setupDiv, {
+                text: phoneUrl,
+                width: 220,
+                height: 220,
+                colorDark: '#2196F3',
+                colorLight: '#0d1117'
+              });
+              console.log('[ARGUS] 📱 ✅ QR code generated on setup screen');
+            }
+
+            // Also generate on the small exam-screen QR panel
+            const examQrDiv = document.getElementById('qrCanvas');
+            if (examQrDiv) {
+              examQrDiv.innerHTML = '';
+              new QRCode(examQrDiv, {
+                text: phoneUrl,
+                width: 130,
+                height: 130,
+                colorDark: '#2196F3',
+                colorLight: '#ffffff'
+              });
+              document.getElementById('secondaryCamPanel').style.display = 'block';
+            }
+          }
+        });
+
+        // Listen for incoming connection from phone
+        secondaryPeer.on('connection', (conn) => {
+          console.log('[ARGUS] 📱 Phone connecting...');
+          secondaryConn = conn;
+
+          conn.on('open', () => {
+            console.log('[ARGUS] 📱 ✅ Phone connected!');
+
+            // Update QR setup screen status to GREEN
+            const qrStatusDot = document.getElementById('qrStatusDot');
+            const qrStatusText = document.getElementById('qrStatusText');
+            const qrSetupStatus = document.getElementById('qrSetupStatus');
+            const qrContinueBtn = document.getElementById('qrContinueBtn');
+
+            if (qrStatusDot) qrStatusDot.style.background = '#22c55e';
+            if (qrStatusText) {
+              qrStatusText.textContent = '✅ Phone connected — desk monitoring active';
+              qrStatusText.style.color = '#22c55e';
+            }
+            if (qrSetupStatus) {
+              qrSetupStatus.style.background = 'rgba(34,197,94,0.06)';
+              qrSetupStatus.style.borderColor = 'rgba(34,197,94,0.2)';
+            }
+            if (qrContinueBtn) {
+              qrContinueBtn.disabled = false;
+              qrContinueBtn.style.opacity = '1';
+              qrContinueBtn.style.cursor = 'pointer';
+            }
+
+            // Hide QR on exam screen, show status
+            document.getElementById('secondaryCamQR').style.display = 'none';
+            document.getElementById('secondaryCamStatus').style.display = 'block';
+
+            // Update navbar badge to connected (green)
+            const navBadge = document.getElementById('secondaryCamBadge');
+            const navBadgeDot = document.getElementById('secondaryCamBadgeDot');
+            const navBadgeText = document.getElementById('secondaryCamBadgeText');
+            if (navBadge) {
+              navBadge.style.display = 'flex';
+              navBadge.style.background = 'rgba(34,197,94,0.1)';
+              navBadge.style.borderColor = 'rgba(34,197,94,0.3)';
+            }
+            if (navBadgeDot) navBadgeDot.style.background = '#22c55e';
+            if (navBadgeText) navBadgeText.textContent = '📱 Connected';
+
+            showWarningPopup('📱 Secondary camera connected — keyboard monitoring active');
+          });
+
+          conn.on('data', (data) => {
+            try {
+              const msg = JSON.parse(data);
+
+              if (msg.type === 'handshake') {
+                console.log('[ARGUS] 📱 Handshake received from:', msg.device);
+              }
+
+              // AI Detection Ready notification
+              if (msg.type === 'detection_ready') {
+                console.log('[ARGUS] 📱 🧠 AI object detection active on phone');
+                const aiStatus = document.getElementById('secCamAIStatus');
+                if (aiStatus) aiStatus.style.display = 'block';
+                showWarningPopup('🧠 AI object detection active on secondary camera');
+              }
+
+              // Object Detection Alert from phone (Gemini or COCO-SSD)
+              if (msg.type === 'object_detection') {
+                handleObjectDetectionAlert(msg);
+              }
+
+              // Gemini vision flag from phone
+              if (msg.type === 'flag') {
+                console.log('[ARGUS] 📱 Gemini flag from phone:', msg.detail);
+                showWarningPopup('📱 Desk Camera: ' + msg.detail);
+                addFlag('secondary_camera', msg.detail);
+
+                // Store the snapshot from Gemini analysis if available
+                if (msg.snapshot) {
+                  const deskFlagEntry = {
+                    image: 'data:image/jpeg;base64,' + msg.snapshot,
+                    timestamp: Date.now(),
+                    count: secondarySnapshots.length + 1,
+                    flagType: 'gemini_desk_flag',
+                    confidence: msg.confidence || 0,
+                    items: msg.items || [],
+                    detectedObjects: (msg.items || []).map(item => ({ class: item }))
+                  };
+                  secondarySnapshots.push(deskFlagEntry);
+                  if (secondarySnapshots.length % 3 === 0) saveSecondarySnapshots();
+                }
+              }
+
+              if (msg.type === 'snapshot') {
+                secondarySnapshots.push({
+                  image: msg.image,
+                  timestamp: msg.timestamp,
+                  count: msg.count,
+                  detectedObjects: msg.detectedObjects || []
+                });
+
+                if (secondarySnapshots.length > 60) {
+                  secondarySnapshots = secondarySnapshots.slice(-60);
+                }
+
+                const preview = document.getElementById('secCamPreview');
+                const previewImg = document.getElementById('secCamPreviewImg');
+                if (preview && previewImg) {
+                  previewImg.src = msg.image;
+                  preview.style.display = 'block';
+                }
+
+                const countEl = document.getElementById('secCamSnapCount');
+                if (countEl) countEl.textContent = 'Snapshots: ' + msg.count;
+
+                console.log('[ARGUS] 📱 Received snapshot #' + msg.count);
+                if (msg.count % 5 === 0) saveSecondarySnapshots();
+              }
+            } catch (e) {
+              console.warn('[ARGUS] 📱 Invalid message from phone:', e);
+            }
+          });
+
+          conn.on('close', () => {
+            console.log('[ARGUS] 📱 Phone disconnected');
+            const label = document.getElementById('secCamLabel');
+            const dot = document.getElementById('secCamDot');
+            if (label) label.textContent = '📱 Disconnected';
+            if (dot) dot.style.background = '#ef4444';
+
+            const aiStatus = document.getElementById('secCamAIStatus');
+            if (aiStatus) aiStatus.style.display = 'none';
+
+            // Update navbar badge to disconnected (red)
+            const navBadge = document.getElementById('secondaryCamBadge');
+            const navBadgeDot = document.getElementById('secondaryCamBadgeDot');
+            const navBadgeText = document.getElementById('secondaryCamBadgeText');
+            if (navBadge) {
+              navBadge.style.background = 'rgba(239,68,68,0.1)';
+              navBadge.style.borderColor = 'rgba(239,68,68,0.3)';
+            }
+            if (navBadgeDot) navBadgeDot.style.background = '#ef4444';
+            if (navBadgeText) navBadgeText.textContent = '📱 Disconnected';
+          });
+        });
+
+        secondaryPeer.on('error', (err) => {
+          console.warn('[ARGUS] 📱 Peer error:', err.message);
+          // Update QR setup screen status
+          const qrStatusText = document.getElementById('qrStatusText');
+          if (qrStatusText) {
+            qrStatusText.textContent = '⚠️ Connection error — try refreshing';
+            qrStatusText.style.color = '#f59e0b';
+          }
+        });
+
+      } catch (e) {
+        console.warn('[ARGUS] Failed to setup secondary camera:', e.message);
+      }
+    }
+
+    // Object severity levels
+    const OBJECT_SEVERITY = {
+      'cell phone': { level: 'critical', emoji: '📱', label: 'Cell Phone' },
+      'book': { level: 'high', emoji: '📖', label: 'Book' },
+      'laptop': { level: 'high', emoji: '💻', label: 'Laptop' },
+      'remote': { level: 'medium', emoji: '🎮', label: 'Remote' },
+      'scissors': { level: 'low', emoji: '✂️', label: 'Scissors' },
+      'backpack': { level: 'medium', emoji: '🎒', label: 'Backpack' },
+      'bottle': { level: 'low', emoji: '🍶', label: 'Bottle' },
+      'mouse': { level: 'low', emoji: '🖱', label: 'Mouse' }
+    };
+
+    function handleObjectDetectionAlert(msg) {
+      const objClass = msg.object;
+      const confidence = msg.confidence;
+      const now = Date.now();
+
+      console.log('[ARGUS] 📱 🚨 Object detection alert:', objClass, confidence + '%');
+
+      // PC-side cooldown: 30 seconds per object type to avoid flag spam
+      const lastFlagged = objectDetectionCooldowns[objClass] || 0;
+      const cooldownActive = (now - lastFlagged) < 30000;
+
+      // Always update the UI panel
+      updateObjectDetectionUI(msg);
+
+      // Store detection event (for dashboard)
+      const detectionEvent = {
+        object: objClass,
+        confidence: confidence,
+        timestamp: now,
+        allObjects: msg.allObjects || [objClass],
+        flagged: !cooldownActive
+      };
+      secondaryObjectDetections.push(detectionEvent);
+
+      // Keep last 100 events
+      if (secondaryObjectDetections.length > 100) {
+        secondaryObjectDetections = secondaryObjectDetections.slice(-100);
+      }
+
+      // Save to localStorage
+      saveObjectDetections();
+
+      // Only add a flag if cooldown is not active
+      if (!cooldownActive) {
+        objectDetectionCooldowns[objClass] = now;
+
+        const severity = OBJECT_SEVERITY[objClass] || { level: 'medium', emoji: '⚠️', label: objClass };
+
+        // Show warning popup
+        showWarningPopup(
+          severity.emoji + ' ARGUS detected ' + severity.label.toUpperCase() +
+          ' on desk area (' + confidence + '% confidence)'
+        );
+
+        // Add proctoring flag
+        addFlag(
+          'secondary_object_detected',
+          severity.emoji + ' ' + severity.label + ' detected on keyboard/desk area via secondary camera (confidence: ' +
+          confidence + '%)'
+        );
+
+        console.log('[ARGUS] 📱 🚨 FLAG ADDED: ' + objClass + ' (' + confidence + '%)');
+      } else {
+        console.log('[ARGUS] 📱 ⏳ Object cooldown active for:', objClass);
+      }
+    }
+
+    function updateObjectDetectionUI(msg) {
+      const alertBox = document.getElementById('secCamObjectAlert');
+      const labelEl = document.getElementById('secCamObjectLabel');
+      const listEl = document.getElementById('secCamObjectList');
+      const aiStatus = document.getElementById('secCamAIStatus');
+
+      if (!alertBox) return;
+
+      // Show the alert panel
+      alertBox.style.display = 'block';
+
+      // Update label
+      const severity = OBJECT_SEVERITY[msg.object] || { emoji: '⚠️', label: msg.object };
+      labelEl.textContent = '🚨 ' + severity.label + ' Detected!';
+
+      // Show all detected objects
+      if (msg.allObjects && msg.allObjects.length > 0) {
+        listEl.textContent = msg.allObjects.map(o => {
+          const s = OBJECT_SEVERITY[o] || { emoji: '•', label: o };
+          return s.emoji + ' ' + s.label;
+        }).join(' · ');
+      }
+
+      // Flash AI status to alert mode
+      if (aiStatus) {
+        aiStatus.style.background = 'rgba(239,68,68,0.08)';
+        aiStatus.style.borderColor = 'rgba(239,68,68,0.25)';
+        const aiLabel = document.getElementById('secCamAILabel');
+        if (aiLabel) aiLabel.textContent = '🚨 AI Alert';
+        aiLabel.style.color = '#ef4444';
+
+        // Reset after 5 seconds
+        setTimeout(() => {
+          if (aiStatus) {
+            aiStatus.style.background = 'rgba(34,197,94,0.08)';
+            aiStatus.style.borderColor = 'rgba(34,197,94,0.2)';
+            if (aiLabel) {
+              aiLabel.textContent = '🧠 AI Detection Active';
+              aiLabel.style.color = '#22c55e';
+            }
+          }
+        }, 5000);
+      }
+
+      // Auto-hide alert after 8 seconds
+      setTimeout(() => {
+        if (alertBox) alertBox.style.display = 'none';
+      }, 8000);
+    }
+
+    function saveObjectDetections() {
+      try {
+        const toSave = secondaryObjectDetections.slice(-50);
+        localStorage.setItem('argus_object_detections', JSON.stringify(toSave));
+      } catch (e) {
+        console.warn('[ARGUS] 📱 Failed to save object detections:', e.message);
+      }
+    }
+
+    function saveSecondarySnapshots() {
+      try {
+        // Save last 10 snapshots for dashboard (to avoid localStorage limits)
+        const toSave = secondarySnapshots.slice(-10);
+        localStorage.setItem('argus_secondary_snapshots', JSON.stringify(toSave));
+        console.log('[ARGUS] 📱 Saved', toSave.length, 'secondary snapshots to localStorage');
+      } catch (e) {
+        console.warn('[ARGUS] 📱 Failed to save secondary snapshots:', e.message);
+      }
+    }
+
+    function cleanupSecondaryCamera() {
+      // Notify phone that exam ended
+      if (secondaryConn && secondaryConn.open) {
+        try {
+          secondaryConn.send(JSON.stringify({ type: 'exam_ended' }));
+        } catch (e) { }
+        secondaryConn.close();
+      }
+
+      if (secondaryPeer) {
+        try { secondaryPeer.destroy(); } catch (e) { }
+      }
+
+      // Final save of all snapshots
+      saveSecondarySnapshots();
+      console.log('[ARGUS] 📱 Secondary camera cleaned up');
+    }
+
+    // ── End Exam ──
+    function endExam() {
+      examActive = false;
+      hideFullscreenRequiredModal();
+
+      clearInterval(timerInterval);
+      clearInterval(snapshotInterval);
+      if (faceDetectionInterval) clearInterval(faceDetectionInterval);
+      if (headTurnInterval) clearInterval(headTurnInterval);
+      if (headTurnTimer) { clearTimeout(headTurnTimer); headTurnTimer = null; }
+      if (verticalTurnTimer) { clearTimeout(verticalTurnTimer); verticalTurnTimer = null; }
+      if (faceMismatchInterval) { clearInterval(faceMismatchInterval); faceMismatchInterval = null; }
+      stopEyeTracking();
+      stopAudioMonitoring();
+      cleanupSecondaryCamera();
+
+      captureSnapshot('exam_end');
+
+      const durationSecs = Math.round((Date.now() - examStartTime) / 1000);
+      localStorage.setItem('argus_duration', durationSecs.toString());
+      localStorage.setItem('argus_flags', JSON.stringify(flags));
+      localStorage.setItem('audioFlags', String(audioFlagCount));
+      localStorage.setItem('argus_snapshots', JSON.stringify(snapshots));
+      localStorage.setItem('eyeTrackingFlags', String(eyeTrackingFlagCount));
+
+      // Save final object detections
+      saveObjectDetections();
+
+      // Determine local suspicion score for DB update
+      const scoreMap = {
+        'tab_switch': 15, 'fullscreen_exit': 15, 'copy_attempt': 20,
+        'right_click': 10, 'multiple_faces': 25, 'no_face': 10, 'gaze_away': 8,
+        'recalibration_requested': 5, 'recalibration_complete': 0,
+        'face_mismatch': 35, 'audio_detected': 12,
+        'secondary_object_detected': 20,
+        'secondary_camera': 18
+      };
+      let score = 0;
+      flags.forEach(f => { score += scoreMap[f.type] || 10; });
+      score = Math.min(score, 100);
+
+      let tempVerdict = 'CLEAN';
+      if (score > 50) tempVerdict = 'HIGH RISK';
+      else if (score > 20) tempVerdict = 'SUSPICIOUS';
 
 
 
-  if (webcamVideo.srcObject) webcamVideo.srcObject.getTracks().forEach(t => t.stop());
+      if (webcamVideo.srcObject) webcamVideo.srcObject.getTracks().forEach(t => t.stop());
 
-  // Exit Electron kiosk/fullscreen via IPC (if running in Electron)
-  if (window.electronAPI && window.electronAPI.endExam) {
-    window.electronAPI.endExam();
-  }
+      // Exit Electron kiosk/fullscreen via IPC (if running in Electron)
+      if (window.electronAPI && window.electronAPI.endExam) {
+        window.electronAPI.endExam();
+      }
 
-  // Also exit browser fullscreen as fallback
-  if (document.fullscreenElement) {
-    document.exitFullscreen().catch(() => {});
-  }
+      // Also exit browser fullscreen as fallback
+      if (document.fullscreenElement) {
+        document.exitFullscreen().catch(() => { });
+      }
 
-  alert('Exam session ended. Your data has been recorded by ARGUS.');
-  window.location.href = 'dashboard.html';
-}
-</script>
+      alert('Exam session ended. Your data has been recorded by ARGUS.');
+      window.location.href = 'dashboard.html';
+    }
+  </script>
 </body>
+
 </html>
